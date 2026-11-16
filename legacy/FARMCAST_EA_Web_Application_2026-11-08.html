@@ -1,1 +1,696 @@
-<!-- Original FARMCAST EA web application recovered from the owner's Library. Preserved unchanged for audit and upgrade reference. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FARMCAST EA - Climate Intelligence for Farmers</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Supabase JS Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              green: '#15803d',
+              lightgreen: '#dcfce7',
+              blue: '#0284c7',
+              lightblue: '#e0f2fe',
+              accent: '#f59e0b',
+              dark: '#0f172a'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #1e293b; }
+    .nav-tab.active { border-bottom: 3px solid #15803d; color: #15803d; font-weight: 600; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between antialiased">
+
+  <!-- Header / Navigation -->
+  <header class="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center space-x-2">
+        <div class="w-10 h-10 rounded-lg bg-green-700 text-white flex items-center justify-center font-bold text-xl shadow">
+          <i class="fa-solid font-bold fa-wheat-awn"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-xl text-gray-900 tracking-tight leading-none">FARMCAST <span class="text-green-700">EA</span></h1>
+          <p class="text-xs text-gray-500 font-medium">Wakiso District Pilot, Uganda</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-2">
+        <span id="db-status-badge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-800">
+          <span class="w-1.5 h-1.5 mr-1 rounded-full bg-amber-500"></span> DB Connecting...
+        </span>
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+          <span class="w-2 h-2 mr-1.5 rounded-full bg-blue-600 animate-pulse"></span> Open-Meteo Live
+        </span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex border-t border-gray-100 max-w-4xl mx-auto px-2 overflow-x-auto text-sm text-gray-600">
+      <button onclick="switchTab('forecast')" id="tab-forecast" class="nav-tab active py-3 px-4 whitespace-nowrap focus:outline-none">
+        <i class="fa-solid fa-cloud-sun-rain mr-1.5"></i> Weather & Crop Advisory
+      </button>
+      <button onclick="switchTab('register')" id="tab-register" class="nav-tab py-3 px-4 whitespace-nowrap focus:outline-none">
+        <i class="fa-solid fa-user-plus mr-1.5"></i> Join Pilot
+      </button>
+      <button onclick="switchTab('report')" id="tab-report" class="nav-tab py-3 px-4 whitespace-nowrap focus:outline-none">
+        <i class="fa-solid fa-pen-to-square mr-1.5"></i> Report Observation
+      </button>
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-tab py-3 px-4 whitespace-nowrap focus:outline-none">
+        <i class="fa-solid fa-chart-line mr-1.5"></i> Pilot Stats
+      </button>
+    </nav>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="max-w-4xl mx-auto w-full px-4 py-6 flex-grow">
+
+    <!-- Official Banner Disclaimer -->
+    <div class="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start space-x-3 text-xs text-amber-900">
+      <i class="fa-solid fa-triangle-exclamation text-amber-600 text-base mt-0.5"></i>
+      <div>
+        <span class="font-semibold">Weather Advisory Disclaimer:</span> Forecasts are model-based estimates powered by Open-Meteo. Always cross-reference extreme alerts with Uganda's official Department of Meteorological Services (DMS) at 
+        <a href="https://wids.mwe.go.ug/" target="_blank" class="underline font-bold text-amber-900 hover:text-amber-700">wids.mwe.go.ug</a>.
+      </div>
+    </div>
+
+    <!-- TAB 1: WEATHER & ADVISORY -->
+    <section id="sec-forecast" class="space-y-6">
+      
+      <!-- Location & Crop Selector -->
+      <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider">Select Farm Location & Crop</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Sub-County / Town (Wakiso)</label>
+            <select id="location-select" onchange="fetchWeather()" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-green-600 focus:border-green-600 p-3">
+              <option value="wakiso">Wakiso Town</option>
+              <option value="nabweru">Nabweru</option>
+              <option value="nansana">Nansana</option>
+              <option value="kira">Kira</option>
+              <option value="entebbe">Entebbe</option>
+              <option value="kasangati">Kasangati</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Target Crop</label>
+            <select id="crop-select" onchange="updateAdvisory()" class="w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-xl focus:ring-green-600 focus:border-green-600 p-3">
+              <option value="maize">Maize (Ekitooke / Kasooli)</option>
+              <option value="beans">Beans (Bijanjalo)</option>
+              <option value="coffee">Coffee (Kawa)</option>
+              <option value="bananas">Bananas (Matooke)</option>
+              <option value="vegetables">Vegetables / Tomatoes</option>
+            </select>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Current Weather Display -->
+      <div id="weather-card" class="bg-gradient-to-br from-green-800 to-green-900 text-white p-6 rounded-2xl shadow-md relative overflow-hidden">
+        <div class="flex justify-between items-start relative z-10">
+          <div>
+            <span id="loc-display" class="text-lg font-bold">Wakiso Town</span>
+            <p class="text-xs text-green-200" id="update-time">Updating live forecast...</p>
+          </div>
+          <span id="weather-icon" class="text-4xl"><i class="fa-solid fa-cloud-sun"></i></span>
+        </div>
+
+        <div class="mt-6 flex items-baseline space-x-2 relative z-10">
+          <span id="temp-display" class="text-5xl font-extrabold">--°C</span>
+          <span id="condition-text" class="text-sm font-medium text-green-100">Loading weather data...</span>
+        </div>
+
+        <div class="mt-6 grid grid-cols-3 gap-2 border-t border-green-700/60 pt-4 text-center relative z-10">
+          <div>
+            <p class="text-[10px] text-green-200 uppercase tracking-wider">Rain Prob.</p>
+            <p id="rain-prob" class="text-base font-bold">--%</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-green-200 uppercase tracking-wider">Expected Rain</p>
+            <p id="precip-amount" class="text-base font-bold">-- mm</p>
+          </div>
+          <div>
+            <p class="text-[10px] text-green-200 uppercase tracking-wider">Wind Speed</p>
+            <p id="wind-speed" class="text-base font-bold">-- km/h</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weather Alert Box (Dynamic) -->
+      <div id="alert-box" class="hidden p-4 bg-red-50 border border-red-200 rounded-xl text-red-800 flex items-start space-x-3">
+        <i class="fa-solid fa-triangle-exclamation text-xl text-red-600 mt-0.5"></i>
+        <div>
+          <h4 class="font-bold text-sm" id="alert-title">Weather Warning</h4>
+          <p class="text-xs mt-1" id="alert-msg">Heavy rainfall expected. Prepare drainage channels.</p>
+        </div>
+      </div>
+
+      <!-- Agricultural Advisory Section -->
+      <div class="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+          <div class="flex items-center space-x-2">
+            <i class="fa-solid fa-seedling text-green-700 text-lg"></i>
+            <h3 class="font-bold text-gray-900">Actionable Farm Decision</h3>
+          </div>
+          <span id="crop-badge" class="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Maize</span>
+        </div>
+
+        <div id="advisory-content" class="space-y-2 text-sm text-gray-700 leading-relaxed">
+          <p class="text-gray-500 italic">Select location and crop above to generate localized decision advice.</p>
+        </div>
+
+        <div class="pt-2">
+          <p class="text-[11px] text-gray-400 border-t border-gray-100 pt-2">
+            <i class="fa-solid fa-circle-info mr-1"></i> Advisories co-designed with extension methodologies for smallholders in Central Uganda.
+          </p>
+        </div>
+      </div>
+
+      <!-- WhatsApp Quick Subscribe Banner -->
+      <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div class="space-y-1 text-center sm:text-left">
+          <h3 class="font-bold text-blue-900 text-sm">Get Daily Weather & Advisories on WhatsApp</h3>
+          <p class="text-xs text-blue-700">Receive free SMS/WhatsApp alerts directly for your farm in Wakiso.</p>
+        </div>
+        <button onclick="switchTab('register')" class="w-full sm:w-auto bg-green-700 hover:bg-green-800 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition shadow">
+          <i class="fa-brands fa-whatsapp mr-1 text-sm"></i> Subscribe Free
+        </button>
+      </div>
+
+    </section>
+
+    <!-- TAB 2: FARMER REGISTRATION -->
+    <section id="sec-register" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">Join the FARMCAST EA Pilot</h2>
+          <p class="text-xs text-gray-500">Participate in our Wakiso climate information study. Free of charge.</p>
+        </div>
+
+        <form id="pilot-reg-form" onsubmit="handleRegistration(event)" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Full Name / Preferred Identifier *</label>
+            <input type="text" id="reg-name" required placeholder="e.g. Mukasa Joseph" class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-green-600 focus:border-green-600">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Sub-County / Village *</label>
+              <select id="reg-location" class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-green-600 focus:border-green-600">
+                <option value="Wakiso Town">Wakiso Town</option>
+                <option value="Nabweru">Nabweru</option>
+                <option value="Nansana">Nansana</option>
+                <option value="Kira">Kira</option>
+                <option value="Entebbe">Entebbe</option>
+                <option value="Kasangati">Kasangati</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Main Crop Grown *</label>
+              <select id="reg-crop" class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-green-600 focus:border-green-600">
+                <option value="Maize">Maize</option>
+                <option value="Beans">Beans</option>
+                <option value="Coffee">Coffee</option>
+                <option value="Bananas">Bananas</option>
+                <option value="Vegetables">Vegetables</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">WhatsApp Phone Number *</label>
+              <input type="tel" id="reg-phone" required placeholder="+256 700 000 000" class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-green-600 focus:border-green-600">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Preferred Language *</label>
+              <select id="reg-lang" class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-green-600 focus:border-green-600">
+                <option value="Luganda">Luganda</option>
+                <option value="English">English</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+            <label class="flex items-start space-x-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" id="reg-consent" required class="mt-0.5 rounded text-green-700 focus:ring-green-600">
+              <span>I voluntarily consent to receiving weather forecasts, advisories, and study surveys via WhatsApp. I can opt-out anytime by typing <strong>STOP</strong>.</span>
+            </label>
+          </div>
+
+          <button type="submit" id="reg-btn" class="w-full bg-green-700 hover:bg-green-800 text-white font-bold p-3.5 rounded-xl text-sm shadow transition">
+            Complete Registration
+          </button>
+        </form>
+
+        <div id="reg-success" class="hidden p-4 bg-green-100 text-green-900 border border-green-300 rounded-xl text-xs space-y-2">
+          <p class="font-bold text-sm"><i class="fa-solid fa-circle-check text-green-700"></i> Farmer Successfully Registered!</p>
+          <p>Your Farmer ID code is: <strong id="assigned-farmer-id" class="text-green-900 underline">FEA-WAK-000</strong></p>
+          <p class="text-gray-600">Save this ID code for reporting feedback and observations.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: OBSERVATION REPORTING -->
+    <section id="sec-report" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900">Report Local Weather Observation</h2>
+          <p class="text-xs text-gray-500">Help validate satellite forecasts by sending ground rain and ground observations.</p>
+        </div>
+
+        <form id="obs-form" onsubmit="handleObservation(event)" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Farmer ID Code</label>
+              <input type="text" id="obs-farmer-id" placeholder="FEA-WAK-101" class="w-full border border-gray-300 p-3 rounded-xl text-sm">
+            </div>
+
+            <div>
+              <label class="block text-xs font-medium text-gray-700 mb-1">Sub-County / Village</label>
+              <select id="obs-location" class="w-full border border-gray-300 p-3 rounded-xl text-sm">
+                <option value="Wakiso Town">Wakiso Town</option>
+                <option value="Nabweru">Nabweru</option>
+                <option value="Nansana">Nansana</option>
+                <option value="Kira">Kira</option>
+                <option value="Entebbe">Entebbe</option>
+                <option value="Kasangati">Kasangati</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Observed Rainfall Today</label>
+            <select id="obs-rain" class="w-full border border-gray-300 p-3 rounded-xl text-sm">
+              <option value="No Rain">No Rain (Dry Day)</option>
+              <option value="Light Drizzle">Light Drizzle</option>
+              <option value="Moderate Rain">Moderate Rainfall</option>
+              <option value="Heavy Downpour">Heavy Storm / Downpour</option>
+              <option value="Hailstorm">Hailstorm</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700 mb-1">Impact or Comments</label>
+            <textarea id="obs-comment" rows="3" placeholder="e.g. Heavy winds damaged maize leaves in Nabweru village..." class="w-full border border-gray-300 p-3 rounded-xl text-sm"></textarea>
+          </div>
+
+          <button type="submit" id="obs-btn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold p-3.5 rounded-xl text-sm shadow transition">
+            Submit Ground Observation
+          </button>
+        </form>
+
+        <div id="obs-success" class="hidden p-4 bg-blue-100 text-blue-900 border border-blue-300 rounded-xl text-xs">
+          <i class="fa-solid fa-circle-check text-blue-700"></i> Observation recorded. Thank you for contributing ground truth data!
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: PILOT MONITORING DASHBOARD -->
+    <section id="sec-dashboard" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-lg font-bold text-gray-900">Wakiso Pilot Monitoring</h2>
+            <p class="text-xs text-gray-500">Live analytics for hackathon verification & pilot metrics.</p>
+          </div>
+          <button onclick="exportCSV()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300">
+            <i class="fa-solid fa-download mr-1"></i> Export CSV
+          </button>
+        </div>
+
+        <!-- Metric Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div class="p-4 bg-green-50 rounded-xl border border-green-200">
+            <p class="text-[10px] text-green-700 uppercase font-semibold">Registered Farmers</p>
+            <p id="dash-farmer-count" class="text-2xl font-black text-green-900 mt-1">0</p>
+          </div>
+          <div class="p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <p class="text-[10px] text-blue-700 uppercase font-semibold">Advisories Sent</p>
+            <p id="dash-advisory-count" class="text-2xl font-black text-blue-900 mt-1">0</p>
+          </div>
+          <div class="p-4 bg-amber-50 rounded-xl border border-amber-200">
+            <p class="text-[10px] text-amber-700 uppercase font-semibold">Observations</p>
+            <p id="dash-obs-count" class="text-2xl font-black text-amber-900 mt-1">0</p>
+          </div>
+          <div class="p-4 bg-purple-50 rounded-xl border border-purple-200">
+            <p class="text-[10px] text-purple-700 uppercase font-semibold">WhatsApp Opt-In</p>
+            <p id="dash-optin-rate" class="text-2xl font-black text-purple-900 mt-1">100%</p>
+          </div>
+        </div>
+
+        <!-- Recent Registrations Table -->
+        <div class="space-y-2 pt-2">
+          <h3 class="text-xs font-bold text-gray-700 uppercase">Recent Registered Farmers (Wakiso)</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr class="bg-gray-100 text-gray-600 font-semibold border-b">
+                  <th class="p-2.5">ID</th>
+                  <th class="p-2.5">Name</th>
+                  <th class="p-2.5">Sub-County</th>
+                  <th class="p-2.5">Crop</th>
+                  <th class="p-2.5">Lang</th>
+                </tr>
+              </thead>
+              <tbody id="farmer-table-body" class="divide-y divide-gray-100 text-gray-700">
+                <!-- Populated dynamically JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-gray-200 mt-8 py-6 text-center text-xs text-gray-500">
+    <div class="max-w-4xl mx-auto px-4 space-y-2">
+      <p class="font-medium text-gray-700">FARMCAST EA — IGAD Youth4Climate Services Innovation Hackathon</p>
+      <p>Developed for smallholder climate resilience in Wakiso District, Uganda.</p>
+      <p class="text-[10px] text-gray-400">Powered by Next.js, Open-Meteo, Supabase & Meta WhatsApp Business Cloud API.</p>
+    </div>
+  </footer>
+
+  <!-- JavaScript App Logic -->
+  <script>
+    // --- SUPABASE LIVE CREDENTIALS ---
+    const SUPABASE_URL = "https://fneugfsorgwkicmxmieo.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_pCsSfzfxu1WO-w07z32I3A_jcXT4TiW"; 
+    
+    let supabaseClient = null;
+    if (SUPABASE_ANON_KEY) {
+      supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      document.getElementById('db-status-badge').className = "inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-100 text-green-800";
+      document.getElementById('db-status-badge').innerHTML = '<span class="w-1.5 h-1.5 mr-1 rounded-full bg-green-600"></span> DB Connected';
+    }
+
+    // Coordinates for Wakiso District Sub-Counties
+    const LOCATIONS = {
+      wakiso: { name: 'Wakiso Town', lat: 0.4044, lon: 32.4594 },
+      nabweru: { name: 'Nabweru', lat: 0.3667, lon: 32.5500 },
+      nansana: { name: 'Nansana', lat: 0.3622, lon: 32.5280 },
+      kira: { name: 'Kira', lat: 0.3981, lon: 32.6386 },
+      entebbe: { name: 'Entebbe', lat: 0.0512, lon: 32.4637 },
+      kasangati: { name: 'Kasangati', lat: 0.4372, lon: 32.6019 }
+    };
+
+    // Crop Advisory Engine Logic
+    const CROP_RULES = {
+      maize: {
+        rain_high: "<strong>Maize Action:</strong> Heavy rainfall forecast. Ensure drainage contours in field are clear to prevent waterlogging. Postpone fertilizer/urea top-dressing until heavy rain passes.",
+        rain_mod: "<strong>Maize Action:</strong> Moderate rain expected. Good conditions for land preparation and planting if soil moisture is adequate.",
+        dry: "<strong>Maize Action:</strong> Dry period expected. Mulch crop rows with dry grass to retain soil moisture and prevent young crop scorching."
+      },
+      beans: {
+        rain_high: "<strong>Beans Action:</strong> Excess moisture increases risk of fungal leaf spot and bean rust. Ensure wide spacing and air flow.",
+        rain_mod: "<strong>Beans Action:</strong> Optimal rainfall for flower podding. Ensure light weeding around bean rows.",
+        dry: "<strong>Beans Action:</strong> Dry spell ahead. Ensure soil cover and consider shade for tender vegetable beans."
+      },
+      coffee: {
+        rain_high: "<strong>Coffee Action:</strong> Wet conditions trigger Coffee Berry Disease (CBD). Inspect trees and clear overgrown shade branches.",
+        rain_mod: "<strong>Coffee Action:</strong> Good rain for pulp development and organic manure application around tree root drip lines.",
+        dry: "<strong>Coffee Action:</strong> Dry spell. Practice banana-coffee intercropping shade management to preserve soil moisture."
+      },
+      bananas: {
+        rain_high: "<strong>Matooke Action:</strong> High winds and heavy rain expected. Prop up heavily fruited banana trees with sturdy wooden poles.",
+        rain_mod: "<strong>Matooke Action:</strong> Favorable conditions. Apply composted manure around matooke stools.",
+        dry: "<strong>Matooke Action:</strong> De-leaf dry leaves and heavy mulch with banana trash around stool bases."
+      },
+      vegetables: {
+        rain_high: "<strong>Vegetables Action:</strong> Rain splash damages tomato/cabbage leaves. Use raised beds and protective straw mulching.",
+        rain_mod: "<strong>Vegetables Action:</strong> Good growing rain. Monitor for aphids and caterpillars.",
+        dry: "<strong>Vegetables Action:</strong> High evapotranspiration! Irrigate early morning or late evening."
+      }
+    };
+
+    let pilotState = {
+      farmers: [],
+      observations: [],
+      currentWeatherData: null
+    };
+
+    // Tab Switcher
+    function switchTab(tabName) {
+      ['forecast', 'register', 'report', 'dashboard'].forEach(t => {
+        document.getElementById(`sec-${t}`).classList.add('hidden');
+        document.getElementById(`tab-${t}`).classList.remove('active');
+      });
+      document.getElementById(`sec-${tabName}`).classList.remove('hidden');
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    // Fetch Weather Data from Open-Meteo
+    async function fetchWeather() {
+      const locKey = document.getElementById('location-select').value;
+      const loc = LOCATIONS[locKey];
+      document.getElementById('loc-display').innerText = loc.name;
+      document.getElementById('condition-text').innerText = 'Fetching live data...';
+
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.lat}&longitude=${loc.lon}&current_weather=true&daily=precipitation_probability_max,precipitation_sum&timezone=Africa%2FNairobi`;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        const temp = Math.round(data.current_weather.temperature);
+        const wind = data.current_weather.windspeed;
+        const rainProb = data.daily.precipitation_probability_max[0] || 35;
+        const precip = data.daily.precipitation_sum[0] || 0.0;
+
+        pilotState.currentWeatherData = { temp, wind, rainProb, precip };
+
+        document.getElementById('temp-display').innerText = `${temp}°C`;
+        document.getElementById('wind-speed').innerText = `${wind} km/h`;
+        document.getElementById('rain-prob').innerText = `${rainProb}%`;
+        document.getElementById('precip-amount').innerText = `${precip} mm`;
+        document.getElementById('condition-text').innerText = rainProb > 50 ? 'Rain Expected Today' : 'Partly Cloudy';
+        document.getElementById('update-time').innerText = `Updated: ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
+        // Check for alerts
+        const alertBox = document.getElementById('alert-box');
+        if (precip > 15 || wind > 25) {
+          alertBox.classList.remove('hidden');
+          document.getElementById('alert-title').innerText = precip > 15 ? 'Heavy Rainfall Warning' : 'Strong Wind Advisory';
+          document.getElementById('alert-msg').innerText = `Forecast predicts ${precip}mm rain and ${wind}km/h winds in ${loc.name}. Take precautions.`;
+        } else {
+          alertBox.classList.add('hidden');
+        }
+
+        updateAdvisory();
+
+      } catch (err) {
+        console.error('Weather Fetch Error:', err);
+        document.getElementById('condition-text').innerText = 'Forecast loaded (Offline Mode)';
+        document.getElementById('temp-display').innerText = '24°C';
+        document.getElementById('rain-prob').innerText = '40%';
+        document.getElementById('precip-amount').innerText = '2.5 mm';
+        document.getElementById('wind-speed').innerText = '12 km/h';
+        updateAdvisory();
+      }
+    }
+
+    // Update Agricultural Advisory
+    function updateAdvisory() {
+      const crop = document.getElementById('crop-select').value;
+      document.getElementById('crop-badge').innerText = crop.toUpperCase();
+
+      const rainProb = pilotState.currentWeatherData ? pilotState.currentWeatherData.rainProb : 40;
+      const precip = pilotState.currentWeatherData ? pilotState.currentWeatherData.precip : 2;
+
+      let ruleText = CROP_RULES[crop].rain_mod;
+      if (precip > 10 || rainProb > 70) {
+        ruleText = CROP_RULES[crop].rain_high;
+      } else if (rainProb < 20) {
+        ruleText = CROP_RULES[crop].dry;
+      }
+
+      document.getElementById('advisory-content').innerHTML = `
+        <p class="p-3 bg-green-50 text-green-900 border-l-4 border-green-700 rounded-r-lg">${ruleText}</p>
+      `;
+    }
+
+    // Handle Pilot Registration (Saved directly to Supabase)
+    async function handleRegistration(e) {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value;
+      const loc = document.getElementById('reg-location').value;
+      const crop = document.getElementById('reg-crop').value;
+      const phone = document.getElementById('reg-phone').value;
+      const lang = document.getElementById('reg-lang').value;
+      const btn = document.getElementById('reg-btn');
+
+      btn.disabled = true;
+      btn.innerText = "Saving Registration...";
+
+      const farmerCode = `FEA-WAK-${100 + pilotState.farmers.length + 1}`;
+
+      if (supabaseClient) {
+        const { data, error } = await supabaseClient
+          .from('farmers')
+          .insert([{ 
+            farmer_code: farmerCode, 
+            full_name: name, 
+            sub_county: loc, 
+            crop: crop, 
+            phone_number: phone, 
+            preferred_language: lang,
+            whatsapp_consent: true 
+          }]);
+
+        if (error) {
+          console.error('Supabase Save Error:', error);
+          alert('Error saving to database: ' + error.message);
+          btn.disabled = false;
+          btn.innerText = "Complete Registration";
+          return;
+        }
+      }
+
+      // Local State Update
+      pilotState.farmers.push({ id: farmerCode, name, loc, crop, lang, phone });
+      document.getElementById('assigned-farmer-id').innerText = farmerCode;
+      document.getElementById('reg-success').classList.remove('hidden');
+      document.getElementById('pilot-reg-form').reset();
+      btn.disabled = false;
+      btn.innerText = "Complete Registration";
+
+      renderDashboard();
+    }
+
+    // Handle Observation Submission (Saved directly to Supabase)
+    async function handleObservation(e) {
+      e.preventDefault();
+      const id = document.getElementById('obs-farmer-id').value || 'Anonymous';
+      const loc = document.getElementById('obs-location').value;
+      const rain = document.getElementById('obs-rain').value;
+      const comment = document.getElementById('obs-comment').value;
+      const btn = document.getElementById('obs-btn');
+
+      btn.disabled = true;
+      btn.innerText = "Submitting...";
+
+      if (supabaseClient) {
+        const { error } = await supabaseClient
+          .from('observations')
+          .insert([{
+            farmer_code: id,
+            sub_county: loc,
+            rainfall_observed: rain,
+            comments: comment
+          }]);
+
+        if (error) {
+          console.error('Observation Save Error:', error);
+        }
+      }
+
+      pilotState.observations.push({ id, loc, rain, comment });
+      document.getElementById('obs-success').classList.remove('hidden');
+      document.getElementById('obs-form').reset();
+      btn.disabled = false;
+      btn.innerText = "Submit Ground Observation";
+
+      renderDashboard();
+    }
+
+    // Fetch Database Records from Supabase
+    async function loadDataFromSupabase() {
+      if (!supabaseClient) return;
+
+      const { data: farmers } = await supabaseClient.from('farmers').select('*');
+      const { data: obs } = await supabaseClient.from('observations').select('*');
+
+      if (farmers && farmers.length > 0) {
+        pilotState.farmers = farmers.map(f => ({
+          id: f.farmer_code,
+          name: f.full_name,
+          loc: f.sub_county,
+          crop: f.crop,
+          lang: f.preferred_language,
+          phone: f.phone_number
+        }));
+      }
+
+      if (obs && obs.length > 0) {
+        pilotState.observations = obs;
+      }
+
+      renderDashboard();
+    }
+
+    // Render Dashboard Analytics
+    function renderDashboard() {
+      document.getElementById('dash-farmer-count').innerText = pilotState.farmers.length;
+      document.getElementById('dash-obs-count').innerText = pilotState.observations.length;
+      document.getElementById('dash-advisory-count').innerText = pilotState.farmers.length * 12;
+
+      const tbody = document.getElementById('farmer-table-body');
+      tbody.innerHTML = '';
+
+      if (pilotState.farmers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">No farmers registered yet. Submit a registration to test!</td></tr>';
+        return;
+      }
+
+      pilotState.farmers.forEach(f => {
+        const row = `
+          <tr>
+            <td class="p-2.5 font-bold text-green-800">${f.id}</td>
+            <td class="p-2.5">${f.name}</td>
+            <td class="p-2.5">${f.loc}</td>
+            <td class="p-2.5"><span class="px-2 py-0.5 rounded bg-gray-100 text-gray-700">${f.crop}</span></td>
+            <td class="p-2.5">${f.lang}</td>
+          </tr>
+        `;
+        tbody.innerHTML += row;
+      });
+    }
+
+    // CSV Export Functionality
+    function exportCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,FarmerID,Name,Location,Crop,Language,Phone\n";
+      pilotState.farmers.forEach(f => {
+        csvContent += `${f.id},"${f.name}",${f.loc},${f.crop},${f.lang},"${f.phone || ''}"\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "FARMCAST_EA_Wakiso_Pilot_Data.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Initialize Page
+    window.onload = function() {
+      fetchWeather();
+      loadDataFromSupabase();
+    };
+  </script>
+</body>
+</html>
