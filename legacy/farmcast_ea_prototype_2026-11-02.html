@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#174d3a">
+<title>FARMCAST EA | Climate services for farmers</title>
+<style>
+:root{--green:#174d3a;--leaf:#2e7655;--pale:#edf5ef;--ink:#1d2b24;--muted:#64736a;--line:#dce6df;--amber:#fff3d8}
+*{box-sizing:border-box}body{margin:0;background:#f6f8f6;color:var(--ink);font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{background:var(--green);color:white;padding:22px max(18px,calc((100% - 1050px)/2))}
+.brand{font-size:23px;font-weight:800;letter-spacing:.4px}.tag{opacity:.85;font-size:13px}
+main{max-width:1050px;margin:22px auto;padding:0 16px 40px}
+.notice{background:var(--amber);border:1px solid #f0d89e;border-radius:12px;padding:12px 14px;font-size:13px;margin-bottom:18px}
+h1{font-size:25px;margin:0 0 5px}h2{font-size:18px;margin:0 0 12px}.muted{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.card{background:white;border:1px solid var(--line);border-radius:15px;padding:17px;box-shadow:0 2px 8px #173d2910}
+.kicker{text-transform:uppercase;letter-spacing:.08em;font-size:11px;color:var(--muted);font-weight:700}
+.big{font-size:28px;font-weight:800;margin:4px 0}.pill{display:inline-block;border-radius:99px;padding:3px 9px;background:var(--pale);color:var(--green);font-size:12px;font-weight:700}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.advisory{border-left:4px solid var(--leaf);padding:9px 12px;background:#f4f8f5;border-radius:0 9px 9px 0;margin:10px 0}
+label{display:block;font-weight:650;font-size:13px;margin:10px 0 5px}
+input,select,textarea{width:100%;padding:11px;border:1px solid #cbd8ce;border-radius:9px;font:inherit;background:white}
+textarea{min-height:82px;resize:vertical}
+button,.button{display:inline-block;border:0;border-radius:9px;background:var(--green);color:white;padding:11px 15px;font-weight:700;font:inherit;text-decoration:none;cursor:pointer}
+button.secondary,.button.secondary{background:var(--pale);color:var(--green);border:1px solid #c8ddce}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+footer{max-width:1050px;margin:auto;padding:0 16px 30px;color:var(--muted);font-size:12px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}.big{font-size:25px}main{margin-top:17px}}
+</style>
+</head>
+<body>
+<header><div class="brand">🌱 FARMCAST EA</div><div class="tag">Climate information made useful for farmers</div></header>
+<main>
+<div class="notice"><strong>Prototype demo:</strong> The weather values and alerts on this page are illustrative sample data, not a live forecast or official warning. Verify conditions with Uganda National Meteorological Authority (UNMA) and local authorities before making farm decisions.</div>
+<h1>Wakiso farmer dashboard</h1>
+<div class="muted">A first prototype for testing how clear climate information can support everyday farm decisions.</div>
+<div class="grid">
+ <section class="card"><div class="kicker">Demo location</div><div class="big">Wakiso</div><span class="pill">Uganda</span><p class="muted">Choose your parish or village when reporting a farm question.</p></section>
+ <section class="card"><div class="kicker">Sample conditions</div><div class="big">Cloudy · 26°C</div><p class="muted">Illustrative only · Not connected to a weather station.</p></section>
+ <section class="card"><div class="kicker">Sample outlook</div><div class="big">Rain possible</div><p class="muted">Illustrative scenario for demonstrating an advisory.</p></section>
+</div>
+<section class="card">
+ <div class="row"><h2>Farm action guidance</h2><span class="pill">Demo advisory</span></div>
+ <div class="advisory"><strong>Before heavy rain:</strong> Check drainage channels, protect harvested produce from moisture, and avoid applying fertiliser immediately before expected runoff.</div>
+ <div class="advisory"><strong>If a dry spell develops:</strong> Prioritise watering for young plants, mulch where suitable, and monitor soil moisture rather than relying on a calendar alone.</div>
+ <div class="advisory"><strong>For planting decisions:</strong> Do not plant based on this demo. Check an updated local forecast and seek advice from an agricultural extension worker.</div>
+</section>
+<div class="grid">
+ <section class="card">
+  <h2>Ask FARMCAST</h2><p class="muted">Send a question or describe a climate-related challenge on your farm.</p>
+  <form id="askForm">
+   <label for="farmer">Your name (optional)</label><input id="farmer" placeholder="e.g. Amina">
+   <label for="place">Village / parish in Wakiso</label><input id="place" required placeholder="e.g. Nabweru">
+   <label for="crop">Main crop or livestock</label><input id="crop" required placeholder="e.g. maize, beans, poultry">
+   <label for="question">What would you like help with?</label><textarea id="question" required placeholder="e.g. How can I prepare for a prolonged dry spell?"></textarea>
+   <div class="actions"><button type="submit">Prepare WhatsApp message</button></div>
+  </form>
+  <p class="muted" id="formStatus" aria-live="polite"></p>
+ </section>
+ <section class="card">
+  <h2>Share a field observation</h2><p class="muted">Help us understand what farmers are experiencing. Do not include private or sensitive information.</p>
+  <form id="reportForm">
+   <label for="event">What did you observe?</label><select id="event"><option>Heavy rainfall / flooding</option><option>Dry spell / water shortage</option><option>Strong wind / storm damage</option><option>Crop or livestock stress</option><option>Other climate-related issue</option></select>
+   <label for="reportPlace">Village / parish</label><input id="reportPlace" required placeholder="Your location in Wakiso">
+   <label for="details">Brief details</label><textarea id="details" required placeholder="What happened and when?"></textarea>
+   <div class="actions"><button type="submit" class="secondary">Prepare observation message</button></div>
+  </form>
+  <p class="muted" id="reportStatus" aria-live="polite"></p>
+ </section>
+ <section class="card">
+  <h2>How the service works</h2>
+  <ol><li>Collect verified weather and climate information.</li><li>Translate it into practical, locally relevant advice.</li><li>Share it through this website and WhatsApp.</li><li>Gather farmer feedback and improve the service.</li></ol>
+  <p class="muted">This version demonstrates the user journey. Live weather feeds, automated WhatsApp delivery and validated agronomic advisories are not yet connected.</p>
+ </section>
+</div>
+</main>
+<footer>FARMCAST EA is an early-stage concept prototype. It is not an emergency alert service and does not replace official forecasts, warnings or professional agricultural advice.</footer>
+<script>
+const enc = s => encodeURIComponent(s);
+document.getElementById('askForm').addEventListener('submit', e=>{
+ e.preventDefault();
+ const msg = `Hello FARMCAST EA. I have a farm question. Name: ${document.getElementById('farmer').value || 'Not provided'}. Location: ${document.getElementById('place').value}. Crop/livestock: ${document.getElementById('crop').value}. Question: ${document.getElementById('question').value}`;
+ document.getElementById('formStatus').textContent='Opening WhatsApp with your message. Choose the FARMCAST EA pilot contact or another recipient.';
+ window.open('https://wa.me/?text='+enc(msg),'_blank','noopener');
+});
+document.getElementById('reportForm').addEventListener('submit', e=>{
+ e.preventDefault();
+ const msg = `FARMCAST EA field observation. Event: ${document.getElementById('event').value}. Location: ${document.getElementById('reportPlace').value}. Details: ${document.getElementById('details').value}`;
+ document.getElementById('reportStatus').textContent='Opening WhatsApp with your observation. Choose the pilot contact or another recipient.';
+ window.open('https://wa.me/?text='+enc(msg),'_blank','noopener');
+});
+</script>
+</body></html>
