@@ -12,7 +12,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div><div class="brand">FARMCAST <span>EA</span></div><small>Climate intelligence for East African agriculture</small></div><nav class="topnav"><a href="#weather">Weather</a><a href="#advisories">Advisories</a><a href="#report">Field report</a><a href="#assistant">Ask AI</a></nav></header>
+<header class="top"><div><div class="brand">FARMCAST <span>EA</span></div><small>Climate intelligence for East African agriculture</small></div><nav class="topnav"><select id="language" aria-label="Language" style="padding:7px;border-radius:8px;border:1px solid #ffffff55;background:#1b5144;color:white"><option value="en">English</option><option value="lg">Luganda</option><option value="sw">Kiswahili</option></select><a href="#weather">Weather</a><a href="#advisories">Advisories</a><a href="#report">Field report</a><a href="#assistant">Ask AI</a></nav></header>
 <main class="wrap">
 <section class="hero"><div><div class="eyebrow">Regional platform · Foundation release</div><h1>Make every growing season<br>more informed.</h1><p>Local weather intelligence, practical crop guidance and farmer field observations — designed to grow across East Africa, starting with verified local conditions.</p></div><span class="pill">12-country regional framework</span></section>
 <div class="grid">
@@ -42,7 +42,13 @@
 <div class="footer">FARMCAST EA · Regional foundation release · Weather: Open-Meteo · Local field notes remain on this device.</div>
 </main>
 <script>
-const countries=[
+const languageText={
+en:{weather:"Weather",advisories:"Advisories",report:"Field report",assistant:"Ask AI",location:"Choose your farming location",country:"Country",place:"Town / district / county",find:"Find place & get weather",wakiso:"Use Wakiso pilot location",guidance:"Weather-aware farming guidance",question:"Your farming question",ask:"Ask FARMCAST AI"},
+lg:{weather:"Obudde",advisories:"Amagezi eri abalimi",report:"Ebyo by'olabye ku nnimiro",assistant:"Buuza AI",location:"Londa ekifo ky'olimamu",country:"Eggwanga",place:"Ekibuga / disitulikiti",find:"Noonya ekifo n'obudde",wakiso:"Kozesa ekifo kya Wakiso",guidance:"Amagezi agasinziira ku mbeera y'obudde",question:"Ekibuuzo kyo eky'obulimi",ask:"Buuza FARMCAST AI"},
+sw:{weather:"Hali ya hewa",advisories:"Ushauri",report:"Ripoti ya shamba",assistant:"Uliza AI",location:"Chagua eneo lako la kilimo",country:"Nchi",place:"Mji / wilaya / kaunti",find:"Tafuta eneo na hali ya hewa",wakiso:"Tumia eneo la majaribio la Wakiso",guidance:"Mwongozo wa kilimo kulingana na hali ya hewa",question:"Swali lako la kilimo",ask:"Uliza FARMCAST AI"}
+};
+$("language").addEventListener("change",()=>{const t=languageText[$("language").value]||languageText.en;document.documentElement.lang=$("language").value==="lg"?"lg":$("language").value==="sw"?"sw":"en";$("location").querySelector("h2").textContent=t.location;$("country").previousElementSibling.textContent=t.country;$("place").previousElementSibling.textContent=t.place;$("findPlace").textContent=t.find;$("useWakiso").textContent=t.wakiso;$("advisories").querySelector("h2").textContent=t.guidance;$("assistant").querySelector("h2").textContent=t.assistant;$("aiQuestion").previousElementSibling.textContent=t.question;$("askAI").textContent=t.ask;const links=document.querySelectorAll(".topnav a");if(links[0])links[0].textContent=t.weather;if(links[1])links[1].textContent=t.advisories;if(links[2])links[2].textContent=t.report;if(links[3])links[3].textContent=t.assistant;});
+\nconst countries=[
 {name:"Uganda",lat:1.37,lon:32.29},{name:"Kenya",lat:0.02,lon:37.91},{name:"Tanzania",lat:-6.37,lon:34.89},{name:"Rwanda",lat:-1.94,lon:29.87},{name:"Burundi",lat:-3.37,lon:29.92},{name:"South Sudan",lat:6.88,lon:31.31},{name:"Ethiopia",lat:9.15,lon:40.49},{name:"Somalia",lat:5.15,lon:46.20},{name:"Djibouti",lat:11.83,lon:42.59},{name:"Democratic Republic of the Congo",lat:-2.88,lon:23.66},{name:"Sudan",lat:12.86,lon:30.22},{name:"Eritrea",lat:15.18,lon:39.78}
 ];
 const $=id=>document.getElementById(id);const country=$("country");
