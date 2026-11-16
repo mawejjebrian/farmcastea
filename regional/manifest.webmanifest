@@ -1,0 +1,11 @@
+{
+  "name": "FARMCAST EA Regional",
+  "short_name": "FARMCAST EA",
+  "description": "Regional climate intelligence for East African agriculture",
+  "start_url": "/regional/",
+  "scope": "/regional/",
+  "display": "standalone",
+  "background_color": "#f5f8f5",
+  "theme_color": "#123c32",
+  "icons": []
+}
