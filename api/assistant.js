@@ -8,8 +8,9 @@ export default async function handler(req, res) {
   const question = typeof req.body?.question === "string" ? req.body.question.trim() : "";
   const location = typeof req.body?.location === "string" ? req.body.location.slice(0, 120) : "East Africa";
   const crop = typeof req.body?.crop === "string" ? req.body.crop.slice(0, 80) : "unspecified";
+  const language = ({ en: "English", lg: "Luganda", sw: "Kiswahili" })[req.body?.language] || "English";
   if (!question || question.length > 1500) return res.status(400).json({ error: "Please submit a question of up to 1,500 characters." });
-  const prompt = `You are FARMCAST EA, a cautious agricultural information assistant for smallholder farmers in East Africa. Context: location ${location}; crop ${crop}. Answer in clear, practical language. Ask clarifying questions when symptoms are ambiguous. Explain what the farmer can safely observe or do next. Never claim certainty from text alone, never prescribe pesticide brands/doses or unsafe chemical mixtures, and advise contacting a qualified local agricultural extension officer for serious disease, pest, poisoning, livestock or food-safety issues. Make clear that weather context is not a field diagnosis. Question: ${question}`;
+  const prompt = `You are FARMCAST EA, a cautious agricultural information assistant for smallholder farmers in East Africa. Context: location ${location}; crop ${crop}. Respond in ${language}. Answer in clear, practical language. Ask clarifying questions when symptoms are ambiguous. Explain what the farmer can safely observe or do next. Never claim certainty from text alone, never prescribe pesticide brands/doses or unsafe chemical mixtures, and advise contacting a qualified local agricultural extension officer for serious disease, pest, poisoning, livestock or food-safety issues. Make clear that weather context is not a field diagnosis. Question: ${question}`;
   try {
     const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key), {
       method: "POST",
