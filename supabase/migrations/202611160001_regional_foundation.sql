@@ -93,6 +93,14 @@ create table if not exists public.advisories (
   created_at timestamptz not null default now()
 );
 
+
+insert into public.countries (code,name,enabled) values
+('UG','Uganda',true),('KE','Kenya',false),('TZ','Tanzania',false),
+('RW','Rwanda',false),('BI','Burundi',false),('SS','South Sudan',false),
+('ET','Ethiopia',false),('SO','Somalia',false),('DJ','Djibouti',false),
+('CD','Democratic Republic of the Congo',false),('SD','Sudan',false),('ER','Eritrea',false)
+on conflict (code) do update set name=excluded.name;
+
 create index if not exists farms_owner_idx on public.farms(owner_id);
 create index if not exists observations_farm_time_idx on public.field_observations(farm_id, observed_at desc);
 create index if not exists admin_areas_country_idx on public.admin_areas(country_code, level);
