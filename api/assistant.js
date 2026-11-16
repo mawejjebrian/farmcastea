@@ -12,7 +12,7 @@ export default async function handler(req, res) {
   if (!question || question.length > 1500) return res.status(400).json({ error: "Please submit a question of up to 1,500 characters." });
   const prompt = `You are FARMCAST EA, a cautious agricultural information assistant for smallholder farmers in East Africa. Context: location ${location}; crop ${crop}. Respond in ${language}. Answer in clear, practical language. Ask clarifying questions when symptoms are ambiguous. Explain what the farmer can safely observe or do next. Never claim certainty from text alone, never prescribe pesticide brands/doses or unsafe chemical mixtures, and advise contacting a qualified local agricultural extension officer for serious disease, pest, poisoning, livestock or food-safety issues. Make clear that weather context is not a field diagnosis. Question: ${question}`;
   try {
-    const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" + encodeURIComponent(key), {
+    const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=" + encodeURIComponent(key), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.35, maxOutputTokens: 700 } })
