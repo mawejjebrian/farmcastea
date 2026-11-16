@@ -334,7 +334,7 @@
         <div class="flex justify-between items-center">
           <div>
             <h2 class="text-lg font-bold text-gray-900">Wakiso Pilot Monitoring</h2>
-            <p class="text-xs text-gray-500">Live analytics for hackathon verification & pilot metrics.</p>
+            <p class="text-xs text-gray-500">This session's activity only. Personal farmer records are not downloaded into a public browser.</p>
           </div>
           <button onclick="exportCSV()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-300">
             <i class="fa-solid fa-download mr-1"></i> Export CSV
@@ -344,7 +344,7 @@
         <!-- Metric Grid -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div class="p-4 bg-green-50 rounded-xl border border-green-200">
-            <p class="text-[10px] text-green-700 uppercase font-semibold">Registered Farmers</p>
+            <p class="text-[10px] text-green-700 uppercase font-semibold">Registered Farmers (this session)</p>
             <p id="dash-farmer-count" class="text-2xl font-black text-green-900 mt-1">0</p>
           </div>
           <div class="p-4 bg-blue-50 rounded-xl border border-blue-200">
@@ -352,11 +352,11 @@
             <p id="dash-advisory-count" class="text-2xl font-black text-blue-900 mt-1">0</p>
           </div>
           <div class="p-4 bg-amber-50 rounded-xl border border-amber-200">
-            <p class="text-[10px] text-amber-700 uppercase font-semibold">Observations</p>
+            <p class="text-[10px] text-amber-700 uppercase font-semibold">Observations (this session)</p>
             <p id="dash-obs-count" class="text-2xl font-black text-amber-900 mt-1">0</p>
           </div>
           <div class="p-4 bg-purple-50 rounded-xl border border-purple-200">
-            <p class="text-[10px] text-purple-700 uppercase font-semibold">WhatsApp Opt-In</p>
+            <p class="text-[10px] text-purple-700 uppercase font-semibold">WhatsApp Opt-In (this session)</p>
             <p id="dash-optin-rate" class="text-2xl font-black text-purple-900 mt-1">0%</p>
           </div>
         </div>
@@ -554,6 +554,7 @@
       const farmerCode = 'FEA-WAK-' + Date.now().toString().slice(-8);
       const { error } = await supabaseClient.from('farmers').insert([{farmer_code:farmerCode,full_name:name,sub_county:loc,crop,phone_number:phone,preferred_language:lang,whatsapp_consent:consent}]);
       if (error) { console.error('Registration save failed:',error); status.textContent='Registration was not saved. Please retry later.'; btn.disabled=false; btn.innerText='Complete Registration'; return; }
+      setDbStatus('DB Connected','connected');
       pilotState.farmers.push({id:farmerCode,name,loc,crop,lang,phone,whatsapp_consent:consent});
       document.getElementById('assigned-farmer-id').innerText=farmerCode; document.getElementById('reg-success').classList.remove('hidden');
       document.getElementById('pilot-reg-form').reset(); status.textContent='Registration saved successfully.'; btn.disabled=false; btn.innerText='Complete Registration'; renderDashboard();
@@ -565,21 +566,16 @@
       if (!supabaseClient) { status.textContent='Database is not configured. This observation was not stored.'; btn.disabled=false; btn.innerText='Submit Ground Observation'; return; }
       const {error}=await supabaseClient.from('observations').insert([{farmer_code:id,sub_county:loc,rainfall_observed:rain,comments:comment}]);
       if(error){console.error('Observation save failed:',error);status.textContent='Observation was not saved. Please retry later.';btn.disabled=false;btn.innerText='Submit Ground Observation';return;}
+      setDbStatus('DB Connected','connected');
       pilotState.observations.push({farmer_code:id,sub_county:loc,rainfall_observed:rain,comments:comment}); document.getElementById('obs-success').classList.remove('hidden');
       document.getElementById('obs-form').reset(); status.textContent='Observation saved successfully.'; btn.disabled=false; btn.innerText='Submit Ground Observation'; renderDashboard();
     }
+    // Privacy-first: never download farmer names, phone numbers or raw observations
+    // into a public browser. A successful insert is the connection test.
     async function checkDatabaseConnection() {
-      if(!supabaseClient){setDbStatus('Local preview only','local');return false;} setDbStatus('DB Checking…','pending');
-      const {error}=await supabaseClient.from('farmers').select('farmer_code').limit(1);
-      if(error){console.warn('Supabase check failed:',error.message);setDbStatus('DB Unavailable','offline');return false;} setDbStatus('DB Connected','connected');return true;
-    }
-    async function loadDataFromSupabase() {
-      if(!supabaseClient)return;
-      const {data:farmers,error:fe}=await supabaseClient.from('farmers').select('farmer_code,full_name,sub_county,crop,preferred_language,phone_number,whatsapp_consent');
-      const {data:obs,error:oe}=await supabaseClient.from('observations').select('farmer_code,sub_county,rainfall_observed,comments');
-      if(fe||oe){console.warn('Could not load pilot records:',fe?.message,oe?.message);return;}
-      pilotState.farmers=(farmers||[]).map(f=>({id:f.farmer_code,name:f.full_name,loc:f.sub_county,crop:f.crop,lang:f.preferred_language,phone:f.phone_number,whatsapp_consent:!!f.whatsapp_consent}));
-      pilotState.observations=obs||[];renderDashboard();
+      if(!supabaseClient){setDbStatus('Local preview only','local');return false;}
+      setDbStatus('DB configured · verify on save','pending');
+      return true;
     }
     function renderDashboard() {
       document.getElementById('dash-farmer-count').innerText=pilotState.farmers.length; document.getElementById('dash-obs-count').innerText=pilotState.observations.length;
@@ -608,7 +604,7 @@
     // Initialize Page
     window.onload = function() {
       fetchWeather();
-      checkDatabaseConnection().then(connected => { if (connected) loadDataFromSupabase(); });
+      checkDatabaseConnection();
     };
   </script>
 </body>
