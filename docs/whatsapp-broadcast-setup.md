@@ -29,7 +29,7 @@ The public FARMCAST EA registration form already collects the farmer's full name
 5. Redeploy the Vercel project after setting the variables.
 6. Open /admin/ and sign in with the confirmed administrator account.
 
-No database migration is required for this contact-only version. It uses the existing farmers table and existing consent fields. It does not create broadcast tables or change public database policies.
+The contact workspace uses the existing farmers table and does not create broadcast/message tables. This hardening branch adds separate WhatsApp consent evidence and opt-out timestamps; apply `supabase/migrations/202611170002_platform_privacy_and_observations.sql` to a dedicated development Supabase project before testing this version. Do not apply it to the production project until the development tests pass and a production backup is available.
 
 ## Import template
 
