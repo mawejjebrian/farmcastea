@@ -8,13 +8,14 @@ const base = () => env("SUPABASE_URL").replace(/\/$/, "");
 function backendKey() {
   return env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
 }
-async function db(path, method = "GET", body, prefer = "") {
+async function db(path, method = "GET", body, prefer = "", range = "") {
   const key = backendKey();
   const headers = {
     apikey: key,
     "Content-Type": "application/json",
     ...(key.startsWith("sb_secret_") ? {} : { Authorization: "Bearer " + key }),
-    ...(prefer ? { Prefer: prefer } : {})
+    ...(prefer ? { Prefer: prefer } : {}),
+    ...(range ? { Range: range } : {})
   };
   const response = await fetch(base() + "/rest/v1/" + path, {
     method,
@@ -52,9 +53,9 @@ function eligibleQuery() {
   return new URLSearchParams({
     select: "id,farmer_code,full_name,phone_number,sub_county,crop,preferred_language,registration_consent_at,created_at",
     whatsapp_consent: "eq.true",
+    whatsapp_consent_at: "not.is.null",
     registration_consent_at: "not.is.null",
-    order: "created_at.asc",
-    limit: "1000"
+    order: "created_at.asc"
   }).toString();
 }
 export default async function handler(req, res) {
@@ -67,7 +68,12 @@ export default async function handler(req, res) {
   if (!admin) return json(res, 401, { error: "Sign in with an approved FARMCAST EA administrator account." });
   try {
     if (req.method === "GET") {
-      const farmers = await db("farmers?" + eligibleQuery());
+      const farmers = [];
+      for (let offset = 0; offset < 100000; offset += 1000) {
+        const page = await db("farmers?" + eligibleQuery(), "GET", undefined, "", offset + "-" + (offset + 999));
+        farmers.push(...page);
+        if (page.length < 1000) break;
+      }
       return json(res, 200, { farmers });
     }
     const body = req.body && typeof req.body === "object" ? req.body : {};
@@ -83,15 +89,15 @@ export default async function handler(req, res) {
         const location = String(row.sub_county || row.location || "").trim();
         const crop = String(row.crop || "").trim();
         const language = String(row.preferred_language || row.language || "English").trim();
-        const consentAt = String(row.consent_recorded_at || "").trim();
-        const consentDate = Date.parse(consentAt);
-        const consentValid = Number.isFinite(consentDate) && consentDate <= Date.now() + 5 * 60 * 1000;
+        const dataConsentAt = Date.parse(String(row.data_consent_recorded_at || "").trim());
+        const whatsappConsentAt = Date.parse(String(row.whatsapp_consent_recorded_at || "").trim());
+        const consentValid = Number.isFinite(dataConsentAt) && Number.isFinite(whatsappConsentAt) && dataConsentAt <= Date.now() + 5 * 60 * 1000 && whatsappConsentAt <= Date.now() + 5 * 60 * 1000;
         if (name.length < 2 || name.length > 100 || !phone ||
             location.length < 2 || location.length > 160 ||
             crop.length < 2 || crop.length > 60 ||
             !["English", "Luganda", "Kiswahili"].includes(language) ||
             !bool(row.data_consent) || !bool(row.whatsapp_consent) || !consentValid) {
-          rejected.push({ row: i + 2, reason: "Missing or invalid details, both consent choices, or a valid consent date." });
+          rejected.push({ row: i + 2, reason: "Missing or invalid details, both separate consent choices, or their recorded dates." });
           continue;
         }
         if (seen.has(phone)) {
@@ -110,7 +116,8 @@ export default async function handler(req, res) {
             phone_number: phone,
             preferred_language: language,
             whatsapp_consent: true,
-            registration_consent_at: new Date(consentDate).toISOString()
+            registration_consent_at: new Date(dataConsentAt).toISOString(),
+            whatsapp_consent_at: new Date(whatsappConsentAt).toISOString()
           }
         });
       }
@@ -137,7 +144,7 @@ export default async function handler(req, res) {
       const rows = await db(
         "farmers?id=eq." + encodeURIComponent(farmerId) + "&select=id",
         "PATCH",
-        { whatsapp_consent: false },
+        { whatsapp_consent: false, whatsapp_opted_out_at: new Date().toISOString() },
         "return=representation"
       );
       if (!rows || !rows.length) return json(res, 404, { error: "Farmer record not found." });
