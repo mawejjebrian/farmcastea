@@ -42,9 +42,10 @@ Download /admin/farmer-import-template.csv. Required columns:
 - preferred_language — English, Luganda, or Kiswahili
 - data_consent — true only if the farmer agreed to registration data storage/use
 - whatsapp_consent — true only if the farmer separately agreed to WhatsApp updates
-- consent_recorded_at — date/time when the consent was actually recorded
+- data_consent_recorded_at — actual date/time the farmer agreed to data storage/use
+- whatsapp_consent_recorded_at — actual date/time the farmer separately opted in to WhatsApp updates
 
-Both consent values must be true. Do not invent a consent date or mark a farmer as opted in without their permission. Existing phone numbers and duplicates in the same upload are skipped.
+Both consent values must be true, and both separate dates must be supplied accurately. Never invent a date or mark a farmer as opted in without permission. Existing records without explicit WhatsApp opt-in evidence are excluded until the farmer reconfirms. Existing phone numbers and duplicates in the same upload are skipped.
 
 ## Sending updates manually
 
@@ -63,5 +64,5 @@ The website export is a contact-management aid. It does not automatically create
 - Farmer contact records are never fetched by the public website.
 - Contact retrieval and updates happen through a server-side API after Supabase Auth validation and exact email allowlist verification.
 - The server-only Supabase secret/service-role key is never sent to the browser.
-- The API returns only WhatsApp-opted-in farmers.
-- Opt-out sets whatsapp_consent to false, excluding the farmer from subsequent exports.
+- The API returns only WhatsApp-opted-in farmers with separate, recorded WhatsApp consent evidence; results are paginated server-side.
+- Opt-out sets whatsapp_consent to false and records the opt-out time, excluding the farmer from subsequent exports. Historical opt-in evidence is retained for audit purposes.
