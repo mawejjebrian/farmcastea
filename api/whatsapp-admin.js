@@ -96,6 +96,14 @@ export default async function handler(req, res) {
       }
       return json(res, 200, { imported: inserted.length, rejected });
     }
+    if (body.action === "opt_out") {
+      const farmerId = String(body.farmer_id || "");
+      if (!/^[0-9a-f-]{36}$/i.test(farmerId)) return json(res, 400, { error: "Invalid farmer record." });
+      await db("farmers?id=eq." + farmerId, "PATCH", {
+        whatsapp_consent: false, whatsapp_opted_out_at: new Date().toISOString()
+      }, "return=minimal");
+      return json(res, 200, { opted_out: true });
+    }
     if (body.action === "create_broadcast") {
       const title = String(body.title || "").trim();
       const template = String(body.template_name || "").trim();
