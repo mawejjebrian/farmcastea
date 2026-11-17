@@ -6,15 +6,18 @@
 const json = (res, status, body) => res.status(status).json(body);
 const env = (name) => (process.env[name] || "").trim();
 const base = () => env("SUPABASE_URL").replace(/\/$/, "");
+function backendKey() { return env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY"); }
 async function db(path, method = "GET", body, prefer = "") {
+  const key = backendKey();
+  const headers = {
+    apikey: key,
+    "Content-Type": "application/json",
+    ...(key.startsWith("sb_secret_") ? {} : { Authorization: "Bearer " + key }),
+    ...(prefer ? { Prefer: prefer } : {})
+  };
   const response = await fetch(base() + "/rest/v1/" + path, {
     method,
-    headers: {
-      apikey: env("SUPABASE_SERVICE_ROLE_KEY"),
-      Authorization: "Bearer " + env("SUPABASE_SERVICE_ROLE_KEY"),
-      "Content-Type": "application/json",
-      ...(prefer ? { Prefer: prefer } : {})
-    },
+    headers,
     ...(body === undefined ? {} : { body: JSON.stringify(body) })
   });
   const raw = await response.text();
@@ -26,7 +29,7 @@ async function db(path, method = "GET", body, prefer = "") {
 async function requireAdmin(req) {
   const authorization = req.headers.authorization || "";
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (!token || !env("SUPABASE_URL") || !env("SUPABASE_ANON_KEY") || !env("SUPABASE_SERVICE_ROLE_KEY")) return null;
+  if (!token || !env("SUPABASE_URL") || !env("SUPABASE_ANON_KEY") || !backendKey()) return null;
   const response = await fetch(base() + "/auth/v1/user", {
     headers: { apikey: env("SUPABASE_ANON_KEY"), Authorization: "Bearer " + token }
   });
@@ -71,7 +74,7 @@ export default async function handler(req, res) {
     const body = req.body && typeof req.body === "object" ? req.body : {};
     if (body.action === "import") {
       if (!Array.isArray(body.rows) || body.rows.length < 1 || body.rows.length > 500) return json(res, 400, { error: "Upload between 1 and 500 farmer rows at a time." });
-      const inserted = [], rejected = [];
+      const candidates = [], rejected = [], seen = new Set();
       for (let i = 0; i < body.rows.length; i++) {
         const row = body.rows[i] || {};
         const name = String(row.full_name || row.name || "").trim();
@@ -83,18 +86,30 @@ export default async function handler(req, res) {
         if (name.length < 2 || name.length > 100 || !phone || location.length < 2 || location.length > 160 || crop.length < 2 || crop.length > 60 || !["English","Luganda","Kiswahili"].includes(language) || !bool(row.data_consent) || !bool(row.whatsapp_consent) || !consentAt || Number.isNaN(Date.parse(consentAt))) {
           rejected.push({ row: i + 2, reason: "Missing or invalid details, data consent, WhatsApp opt-in, or consent date." }); continue;
         }
-        const existing = await db("farmers?select=id&phone_number=eq." + encodeURIComponent(phone) + "&limit=1");
-        if (existing.length) { rejected.push({ row: i + 2, reason: "This WhatsApp number is already registered." }); continue; }
-        const farmer = {
+        if (seen.has(phone)) { rejected.push({ row: i + 2, reason: "Duplicate WhatsApp number in this upload." }); continue; }
+        seen.add(phone);
+        candidates.push({ row: i + 2, phone, farmer: {
           farmer_code: "FEA-IMP-" + crypto.randomUUID().slice(0, 8).toUpperCase(),
           full_name: name, sub_county: location, crop, phone_number: phone,
           preferred_language: language, whatsapp_consent: true,
           registration_consent_at: new Date(consentAt).toISOString()
-        };
-        await db("farmers", "POST", farmer, "return=minimal");
-        inserted.push({ row: i + 2 });
+        }});
       }
-      return json(res, 200, { imported: inserted.length, rejected });
+      if (candidates.length) {
+        const query = new URLSearchParams({ select: "phone_number", phone_number: "in.(" + candidates.map(x => '"' + x.phone + '"').join(",") + ")" });
+        const existing = await db("farmers?" + query.toString());
+        const existingPhones = new Set(existing.map(x => x.phone_number));
+        const fresh = candidates.filter(x => {
+          if (!existingPhones.has(x.phone)) return true;
+          rejected.push({ row: x.row, reason: "This WhatsApp number is already registered." });
+          return false;
+        });
+        if (fresh.length) {
+          await db("farmers", "POST", fresh.map(x => x.farmer), "return=minimal");
+        }
+        return json(res, 200, { imported: fresh.length, rejected });
+      }
+      return json(res, 200, { imported: 0, rejected });
     }
     if (body.action === "opt_out") {
       const farmerId = String(body.farmer_id || "");
@@ -131,13 +146,12 @@ export default async function handler(req, res) {
       const eligible = await db("farmers?" + filterQuery(broadcast.filters));
       const done = await db("whatsapp_message_events?broadcast_id=eq." + id + "&select=farmer_id");
       const doneIds = new Set(done.map(item => item.farmer_id));
-      const batch = eligible.filter(f => !doneIds.has(f.id)).slice(0, 20);
+      const batch = eligible.filter(f => !doneIds.has(f.id)).slice(0, 10);
       if (!batch.length) {
         await db("whatsapp_broadcasts?id=eq." + id, "PATCH", { status: "completed", completed_at: new Date().toISOString() }, "return=minimal");
         return json(res, 200, { completed: true, sent_this_batch: 0 });
       }
-      let accepted = 0, failed = 0;
-      for (const farmer of batch) {
+      const results = await Promise.all(batch.map(async farmer => {
         let messageId = null, status = "failed", errorCode = null;
         try {
           const template = { name: broadcast.template_name, language: { code: broadcast.language_code } };
@@ -151,12 +165,9 @@ export default async function handler(req, res) {
           if (!response.ok) errorCode = String(result.error?.code || response.status);
           else { status = "accepted"; messageId = result.messages?.[0]?.id || null; }
         } catch (_) { errorCode = "NETWORK_ERROR"; }
-        await db("whatsapp_message_events", "POST", {
-          broadcast_id: id, farmer_id: farmer.id, meta_message_id: messageId,
-          status, error_code: errorCode
-        }, "return=minimal");
-        if (status === "accepted") accepted++; else failed++;
-      }
+        return { broadcast_id: id, farmer_id: farmer.id, meta_message_id: messageId, status, error_code: errorCode };
+      }));
+      await db("whatsapp_message_events", "POST", results, "return=minimal");
       const totals = await db("whatsapp_message_events?broadcast_id=eq." + id + "&select=status");
       const acceptedTotal = totals.filter(x => x.status === "accepted" || x.status === "delivered" || x.status === "read").length;
       const failedTotal = totals.filter(x => x.status === "failed").length;
@@ -165,7 +176,7 @@ export default async function handler(req, res) {
         status: complete ? "completed" : "sending", accepted_count: acceptedTotal,
         failed_count: failedTotal, completed_at: complete ? new Date().toISOString() : null
       }, "return=minimal");
-      return json(res, 200, { sent_this_batch: accepted, failed_this_batch: failed, processed: totals.length, total: broadcast.total_recipients, completed: complete });
+      return json(res, 200, { sent_this_batch: results.filter(x => x.status === "accepted").length, failed_this_batch: results.filter(x => x.status === "failed").length, processed: totals.length, total: broadcast.total_recipients, completed: complete });
     }
     return json(res, 400, { error: "Unknown action." });
   } catch (error) {
