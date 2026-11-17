@@ -20,7 +20,7 @@ create policy "Allow validated farmer registrations"
     and length(trim(sub_county)) between 2 and 160
     and length(trim(crop)) between 2 and 60
     and length(trim(phone_number)) between 7 and 24
-    and phone_number ~ '^\\+?[0-9 ()-]{7,24}$'
+    and phone_number ~ '^[+]?[0-9 ()-]{7,24}$'
     and preferred_language in ('English', 'Luganda', 'Kiswahili')
     and registration_consent_at is not null
   );
