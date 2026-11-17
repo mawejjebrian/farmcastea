@@ -131,7 +131,7 @@ async function importContacts(){
  catch(e){say("importResult",e.message);}
  finally{el("importBtn").disabled=false;}
 }
-function csvCell(value){let text=String(value??"");if(/^[\\s]*[=+\\-@\\t\\r]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
+function csvCell(value){let text=String(value??"");if(/^\s*[=+\-@\t\r]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
 function exportCSV(){
  const rows=filteredContacts();if(!rows.length){say("mainStatus","There are no matching opted-in contacts to export.");return;}
  const lines=[["Name","WhatsApp number","Sub-county","Crop","Preferred language"],...rows.map(c=>[c.full_name,c.phone_number,c.sub_county,c.crop,c.preferred_language])];
