@@ -39,7 +39,7 @@
 </section>
 <section class="panel">
 <h2>Upload farmer contacts</h2><p class="muted">Upload a CSV or Excel file. Maximum 500 rows per upload. Duplicate phone numbers are skipped.</p>
-<div class="notice">Every row must have both consent fields marked true and a valid consent date. Do not add contacts from a list unless the farmers agreed to receive WhatsApp updates.</div>
+<div class="notice">Every row must have both consent fields marked true and two separate, accurate consent dates. Existing contacts without recorded WhatsApp opt-in evidence are excluded until they reconfirm.</div>
 <label>Choose CSV or Excel file</label><input id="contactFile" type="file" accept=".csv,.xlsx,.xls">
 <button id="importBtn" onclick="importContacts()">Validate and upload contacts</button>
 <a class="muted" href="/admin/farmer-import-template.csv" download>Download CSV template</a>
@@ -120,7 +120,7 @@ async function addOne(){
  if(!el("oneDataConsent").checked||!el("oneWhatsappConsent").checked){say("mainStatus","Both separate consent choices must be confirmed before adding this contact.");return;}
  if(!name||!phone||!location||!crop){say("mainStatus","Complete the farmer name, WhatsApp number, location and crop.");return;}
  el("addOneBtn").disabled=true;
- try{const result=await api("import",{rows:[{full_name:name,whatsapp_number:phone,sub_county:location,crop,preferred_language:language,data_consent:true,whatsapp_consent:true,consent_recorded_at:new Date().toISOString()}]});say("mainStatus",result.imported?"Farmer contact saved.":"Contact was not added: "+(result.rejected[0]?.reason||"Check the details."));if(result.imported){["oneName","onePhone","oneLocation","oneCrop"].forEach(id=>el(id).value="");el("oneDataConsent").checked=false;el("oneWhatsappConsent").checked=false;}await loadWorkspace();}
+ try{const result=await api("import",{rows:[{full_name:name,whatsapp_number:phone,sub_county:location,crop,preferred_language:language,data_consent:true,whatsapp_consent:true,data_consent_recorded_at:new Date().toISOString(),whatsapp_consent_recorded_at:new Date().toISOString()}]});say("mainStatus",result.imported?"Farmer contact saved.":"Contact was not added: "+(result.rejected[0]?.reason||"Check the details."));if(result.imported){["oneName","onePhone","oneLocation","oneCrop"].forEach(id=>el(id).value="");el("oneDataConsent").checked=false;el("oneWhatsappConsent").checked=false;}await loadWorkspace();}
  catch(e){say("mainStatus",e.message);}
  finally{el("addOneBtn").disabled=false;}
 }
