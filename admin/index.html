@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FARMCAST EA · Farmer Contacts</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif;color:#17251d;background:#f3f7f3}*{box-sizing:border-box}body{margin:0}header{background:#14532d;color:#fff;padding:18px 22px}header small{color:#d1fae5}main{max-width:1100px;margin:24px auto;padding:0 16px}.panel{background:#fff;border:1px solid #dce6de;border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 3px 14px #102b1610}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}label{display:block;font-size:13px;font-weight:650;margin:10px 0 5px}input,select{width:100%;padding:11px;border:1px solid #cbd5ce;border-radius:9px;background:#fff;font:inherit;font-size:14px}input[type=checkbox]{width:auto}button{border:0;border-radius:9px;padding:11px 15px;background:#15803d;color:#fff;font-weight:700;cursor:pointer;margin:5px 4px 5px 0}button.secondary{background:#e8f1eb;color:#14532d}button.danger{background:#fff1f0;color:#a12620}button:disabled{opacity:.5;cursor:not-allowed}.muted{color:#64756a;font-size:13px}.notice{background:#fff7df;border:1px solid #f1d58d;padding:12px;border-radius:10px;font-size:13px}.status{padding:10px;border-radius:8px;background:#eef6ef;margin:10px 0;font-size:13px}.hidden{display:none!important}.tablewrap{overflow:auto}table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:left;padding:10px;border-bottom:1px solid #e6ece7;white-space:nowrap}th{color:#506255}.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{background:#f0f7f1;border-radius:10px;padding:12px 16px;min-width:150px}.stat strong{display:block;font-size:22px;color:#14532d}h1{margin:0;font-size:20px}h2{font-size:17px;margin:0 0 8px}.checkline{display:flex;gap:8px;align-items:flex-start;font-size:13px;color:#44554a;margin:12px 0}.checkline input{margin-top:2px}.topline{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header><h1>🌱 FARMCAST EA · Farmer Contacts</h1><small>Private contact register · Manual WhatsApp Business workflow</small></header>
+<main>
+<section id="login" class="panel" style="max-width:460px;margin:48px auto">
+<h2>Administrator sign in</h2><p class="muted">Farmer names and phone numbers are restricted to approved FARMCAST EA administrators.</p>
+<label>Email</label><input id="email" type="email" autocomplete="username">
+<label>Password</label><input id="password" type="password" autocomplete="current-password">
+<button id="loginBtn" onclick="signIn()">Sign in securely</button><p id="loginStatus" class="muted" role="status"></p>
+</section>
+<div id="workspace" class="hidden">
+<section class="panel">
+<div class="topline"><div><h2>WhatsApp contact overview</h2><p class="muted">Only farmers with recorded WhatsApp opt-in are listed or exported.</p></div><button class="secondary" onclick="signOut()">Sign out</button></div>
+<div class="stats"><div class="stat"><strong id="contactCount">0</strong><span class="muted">Eligible contacts</span></div><div class="stat"><strong id="shownCount">0</strong><span class="muted">Matching filters</span></div></div>
+<p id="mainStatus" class="status" role="status">Loading contacts…</p>
+</section>
+<section class="panel">
+<h2>Add one farmer</h2><p class="muted">Enter a contact only after the farmer has agreed to registration data use and separately opted in to WhatsApp updates.</p>
+<div class="grid">
+<div><label>Farmer's full name</label><input id="oneName" placeholder="Full name"></div>
+<div><label>WhatsApp number (international format)</label><input id="onePhone" placeholder="+2567XXXXXXXX"></div>
+<div><label>Sub-county / village</label><input id="oneLocation" placeholder="e.g. Nabweru"></div>
+<div><label>Main crop</label><input id="oneCrop" placeholder="e.g. Maize"></div>
+<div><label>Preferred language</label><select id="oneLanguage"><option>English</option><option>Luganda</option><option>Kiswahili</option></select></div>
+</div>
+<label class="checkline"><input id="oneDataConsent" type="checkbox"><span>Farmer agreed to FARMCAST EA storing and using their registration details.</span></label>
+<label class="checkline"><input id="oneWhatsappConsent" type="checkbox"><span>Farmer separately agreed to receive FARMCAST EA updates through WhatsApp.</span></label>
+<button id="addOneBtn" onclick="addOne()">Save farmer contact</button>
+</section>
+<section class="panel">
+<h2>Upload farmer contacts</h2><p class="muted">Upload a CSV or Excel file. Maximum 500 rows per upload. Duplicate phone numbers are skipped.</p>
+<div class="notice">Every row must have both consent fields marked true and two separate, accurate consent dates. Existing contacts without recorded WhatsApp opt-in evidence are excluded until they reconfirm.</div>
+<label>Choose CSV or Excel file</label><input id="contactFile" type="file" accept=".csv,.xlsx,.xls">
+<button id="importBtn" onclick="importContacts()">Validate and upload contacts</button>
+<a class="muted" href="/admin/farmer-import-template.csv" download>Download CSV template</a>
+<p id="importResult" class="muted" role="status"></p>
+</section>
+<section class="panel">
+<div class="topline"><div><h2>Eligible farmer contacts</h2><p class="muted">Filter this list, then export the matching contacts for WhatsApp Business.</p></div><button id="exportBtn" onclick="exportCSV()">Export matching contacts (CSV)</button></div>
+<div class="grid">
+<div><label>Search name or number</label><input id="search" oninput="render()" placeholder="Search contacts"></div>
+<div><label>Sub-county</label><select id="filterLocation" onchange="render()"><option value="">All locations</option></select></div>
+<div><label>Crop</label><select id="filterCrop" onchange="render()"><option value="">All crops</option></select></div>
+<div><label>Language</label><select id="filterLanguage" onchange="render()"><option value="">All languages</option></select></div>
+</div>
+<div class="tablewrap"><table><thead><tr><th>Name</th><th>WhatsApp number</th><th>Location</th><th>Crop</th><th>Language</th><th>Action</th></tr></thead><tbody id="contactRows"><tr><td colspan="6">Loading…</td></tr></tbody></table></div>
+<p class="muted">The CSV contains only contacts currently opted in. Store the exported file securely and delete it when no longer needed.</p>
+</section>
+</div>
+</main>
+<script>
+const SUPABASE_URL="https://fneugfsorgwkicmxmieo.supabase.co";
+const SUPABASE_KEY="sb_publishable_pCsSfzfxu1WO-w07z32I3A_jcXT4TiW";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+let contacts=[];
+const el=id=>document.getElementById(id);
+function say(id,message){el(id).textContent=message;}
+async function api(action,payload){
+ const {data:{session}}=await sb.auth.getSession();
+ if(!session)throw new Error("Your session has expired. Sign in again.");
+ const response=await fetch("/api/farmer-contacts",{method:action==="list"?"GET":"POST",headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},...(action==="list"?{}:{body:JSON.stringify({action,...payload})})});
+ const data=await response.json();
+ if(!response.ok)throw new Error(data.error||"Request failed.");
+ return data;
+}
+async function signIn(){
+ el("loginBtn").disabled=true;say("loginStatus","Signing in…");
+ try{const {error}=await sb.auth.signInWithPassword({email:el("email").value.trim(),password:el("password").value});if(error)throw error;await loadWorkspace();}
+ catch(e){say("loginStatus",e.message||"Sign-in failed.");}
+ finally{el("loginBtn").disabled=false;}
+}
+async function signOut(){await sb.auth.signOut();el("workspace").classList.add("hidden");el("login").classList.remove("hidden");contacts=[];}
+async function loadWorkspace(){
+ try{const data=await api("list");contacts=data.farmers||[];el("login").classList.add("hidden");el("workspace").classList.remove("hidden");say("mainStatus","Signed in. Contact details are available only in this protected admin workspace.");populateFilters();render();}
+ catch(e){say("loginStatus",e.message);}
+}
+function populateFilters(){
+ [["filterLocation","sub_county"],["filterCrop","crop"],["filterLanguage","preferred_language"]].forEach(([id,key])=>{
+  const select=el(id),current=select.value;select.replaceChildren(new Option("All "+(key==="sub_county"?"locations":key==="preferred_language"?"languages":"crops"),""));
+  [...new Set(contacts.map(x=>x[key]).filter(Boolean))].sort().forEach(value=>select.add(new Option(value,value)));
+  select.value=current;
+ });
+}
+function filteredContacts(){
+ const q=el("search").value.trim().toLowerCase();
+ return contacts.filter(c=>(!q||String(c.full_name||"").toLowerCase().includes(q)||String(c.phone_number||"").includes(q))&&(!el("filterLocation").value||c.sub_county===el("filterLocation").value)&&(!el("filterCrop").value||c.crop===el("filterCrop").value)&&(!el("filterLanguage").value||c.preferred_language===el("filterLanguage").value));
+}
+function render(){
+ const rows=filteredContacts();el("contactCount").textContent=contacts.length;el("shownCount").textContent=rows.length;
+ const body=el("contactRows");body.replaceChildren();
+ if(!rows.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=6;td.textContent="No opted-in contacts match these filters.";tr.appendChild(td);body.appendChild(tr);return;}
+ rows.forEach(c=>{
+  const tr=document.createElement("tr");
+  [c.full_name,c.phone_number,c.sub_county,c.crop,c.preferred_language||"—"].forEach(value=>{const td=document.createElement("td");td.textContent=value||"—";tr.appendChild(td);});
+  const td=document.createElement("td"),button=document.createElement("button");button.className="danger";button.textContent="Opt out";
+  button.onclick=()=>optOut(c.id);td.appendChild(button);tr.appendChild(td);body.appendChild(tr);
+ });
+}
+async function parseFile(file){
+ const buffer=await file.arrayBuffer(),workbook=XLSX.read(buffer,{type:"array"});
+ return XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]],{defval:""});
+}
+async function sendImport(rows,statusId){
+ const result=await api("import",{rows});
+ say(statusId,result.imported+" imported; "+result.rejected.length+" rejected. "+result.rejected.slice(0,8).map(x=>"Row "+x.row+": "+x.reason).join(" "));
+ await loadWorkspace();
+}
+async function addOne(){
+ const name=el("oneName").value.trim(),phone=el("onePhone").value.trim(),location=el("oneLocation").value.trim(),crop=el("oneCrop").value.trim(),language=el("oneLanguage").value;
+ if(!el("oneDataConsent").checked||!el("oneWhatsappConsent").checked){say("mainStatus","Both separate consent choices must be confirmed before adding this contact.");return;}
+ if(!name||!phone||!location||!crop){say("mainStatus","Complete the farmer name, WhatsApp number, location and crop.");return;}
+ el("addOneBtn").disabled=true;
+ try{const result=await api("import",{rows:[{full_name:name,whatsapp_number:phone,sub_county:location,crop,preferred_language:language,data_consent:true,whatsapp_consent:true,data_consent_recorded_at:new Date().toISOString(),whatsapp_consent_recorded_at:new Date().toISOString()}]});say("mainStatus",result.imported?"Farmer contact saved.":"Contact was not added: "+(result.rejected[0]?.reason||"Check the details."));if(result.imported){["oneName","onePhone","oneLocation","oneCrop"].forEach(id=>el(id).value="");el("oneDataConsent").checked=false;el("oneWhatsappConsent").checked=false;}await loadWorkspace();}
+ catch(e){say("mainStatus",e.message);}
+ finally{el("addOneBtn").disabled=false;}
+}
+async function importContacts(){
+ const file=el("contactFile").files[0];if(!file){say("importResult","Choose a CSV or Excel file first.");return;}
+ el("importBtn").disabled=true;
+ try{say("importResult","Reading and validating file…");const rows=await parseFile(file);await sendImport(rows,"importResult");}
+ catch(e){say("importResult",e.message);}
+ finally{el("importBtn").disabled=false;}
+}
+function csvCell(value){let text=String(value??"");if(/^\s*[=+\-@\t\r]/.test(text))text="'"+text;return '"'+text.replace(/"/g,'""')+'"';}
+function exportCSV(){
+ const rows=filteredContacts();if(!rows.length){say("mainStatus","There are no matching opted-in contacts to export.");return;}
+ const lines=[["Name","WhatsApp number","Sub-county","Crop","Preferred language"],...rows.map(c=>[c.full_name,c.phone_number,c.sub_county,c.crop,c.preferred_language])];
+ const csv="\uFEFF"+lines.map(row=>row.map(csvCell).join(",")).join("\r\n");
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),link=document.createElement("a");
+ link.href=url;link.download="FARMCAST_EA_WhatsApp_Contacts.csv";document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+ say("mainStatus","Exported "+rows.length+" opted-in contacts. Keep the file secure.");
+}
+async function optOut(id){
+ if(!confirm("Stop future FARMCAST EA WhatsApp updates to this farmer?"))return;
+ try{await api("opt_out",{farmer_id:id});contacts=contacts.filter(c=>c.id!==id);render();say("mainStatus","Farmer opted out and removed from future contact exports.");}
+ catch(e){say("mainStatus",e.message);}
+}
+(async()=>{const {data:{session}}=await sb.auth.getSession();if(session)await loadWorkspace();})();
+</script>
+</body>
+</html>
