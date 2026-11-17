@@ -5,6 +5,7 @@ begin;
 
 alter table public.farmers
   add column if not exists whatsapp_consent_at timestamptz,
+  add column if not exists whatsapp_opted_out_at timestamptz,
   add column if not exists registration_consent_version text not null default '2026-11-v1';
 
 -- Consent must be explicit. Existing true values without evidence are deliberately
