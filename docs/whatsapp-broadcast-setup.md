@@ -16,7 +16,7 @@ Set these server-side variables in Vercel Project Settings → Environment Varia
 
 - `SUPABASE_URL`: project URL
 - `SUPABASE_ANON_KEY`: Supabase publishable key (used only to validate a signed-in user)
-- `SUPABASE_SERVICE_ROLE_KEY`: server-only service role key
+- `SUPABASE_SECRET_KEY`: preferred server-only Supabase secret key (or `SUPABASE_SERVICE_ROLE_KEY` for a legacy service-role JWT)
 - `FARMCAST_ADMIN_EMAILS`: comma-separated approved administrator emails
 - `WHATSAPP_ACCESS_TOKEN`: Meta WhatsApp Cloud API access token
 - `WHATSAPP_PHONE_NUMBER_ID`: registered WhatsApp Business phone-number ID
@@ -47,7 +47,7 @@ Rows without both consent flags and a valid consent date are rejected. Existing 
 
 ## 6. Sending and monitoring
 
-Create a campaign using an approved template and the template's language code. An optional single body parameter is supported for templates with one text placeholder. The first implementation sends at most 20 recipients per batch; an administrator must deliberately start each next batch. A result marked `accepted` means Meta accepted the API request, not that the message was delivered or read. Delivery/read webhook reconciliation is a later integration step.
+Create a campaign using an approved template and the template's language code. An optional single body parameter is supported for templates with one text placeholder. The first implementation sends at most 10 recipients per batch; an administrator must deliberately start each next batch. A result marked `accepted` means Meta accepted the API request, not that the message was delivered or read. Delivery/read webhook reconciliation is a later integration step.
 
 Administrators can mark a farmer as opted out. This sets `whatsapp_consent=false` and records the opt-out timestamp; future recipient selection excludes that farmer. Do not re-import an opted-out farmer unless they have explicitly opted in again and a new consent record is available.
 
