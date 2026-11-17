@@ -4,44 +4,40 @@
 
 The live Supabase project currently has public SELECT policies on `public.farmers` and `public.observations`. The farmers table contains names and phone numbers. Row-level security is enabled, but permissive public SELECT policies make those records readable to unauthenticated clients.
 
-The current pilot database contains one farmer record. This remediation must preserve it.
+The current pilot database contains one farmer record. This remediation preserves existing farmer and observation rows.
 
-## Application changes in this branch
+## Application changes
 
 - The public Wakiso pilot no longer reads farmer or observation rows from Supabase.
-- The connection badge is marked as configured until a real insert succeeds; it no longer treats a public SELECT as a health check.
-- Dashboard figures and CSV export are explicitly session-only. They must not be represented as total pilot enrolment.
-- Successful registration and observation inserts mark the database connection as verified.
-- The regional experience adds FARMCAST Field Pulse: crop- and growth-stage-aware field checks that use forecast rain probability and rainfall totals. The prompts are general decision support, not pesticide instructions or a substitute for extension advice.
+- The connection badge no longer uses a public SELECT as a health check.
+- Dashboard figures and CSV exports are limited to the current browser session.
+- Both registration experiences collect required registration-data consent separately from optional WhatsApp consent.
+- Successful farmer registrations include a registration-consent timestamp.
+- Regional Field Pulse provides crop- and growth-stage-aware field checks based on forecast context. It is general decision support, not a diagnosis or pesticide prescription.
 
-## Production database change — apply only after the privacy-safe application is deployed
+## Production database migration
 
-Run as a database owner after confirming the updated pilot page is deployed:
+Apply `supabase/migrations/202611170001_farmer_registration_privacy.sql` only after the privacy-safe application has been deployed.
 
-```sql
-begin;
+The migration:
+1. Adds nullable `registration_consent_at` so existing rows are not assigned consent retroactively.
+2. Removes public SELECT policies on `farmers` and `observations`.
+3. Replaces the permissive public farmer INSERT policy with validation for required fields, phone format, supported language and a non-null consent timestamp.
+4. Revokes direct execution of `public.rls_auto_enable()` from `PUBLIC`, `anon` and `authenticated`.
 
-drop policy if exists "Allow public select of farmers" on public.farmers;
-drop policy if exists "Allow public select of observations" on public.observations;
+The `ensure_rls` event trigger remains installed. The revoke is intended to remove direct API execution by public client roles, not to disable the trigger.
 
-revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
-
-commit;
-```
-
-The `ensure_rls` event trigger remains installed and will continue to execute its function as the event-trigger owner. The revoke removes direct API execution by public client roles.
-
-Do not drop tables, truncate rows, disable RLS, or remove the existing INSERT policies as part of this step. Public registration/observation inserts remain a separate abuse-control concern; add server-side validation and rate limiting before opening the pilot widely.
+The existing observation INSERT policy is retained for the pilot. Public observation submissions still need server-side validation, abuse controls and rate limiting before broad public rollout.
 
 ## Verification after deployment and database remediation
 
-1. Anonymous SELECT from `farmers` must be denied.
-2. Anonymous SELECT from `observations` must be denied.
-3. Existing farmer row count must remain unchanged.
-4. New farmer registration must still insert successfully.
-5. New field observation must still insert successfully.
-6. The public dashboard must show session-only counts and must not download existing personal records.
-7. Supabase security advisors must be rerun; investigate any remaining findings.
+1. Anonymous SELECT from `farmers` is denied.
+2. Anonymous SELECT from `observations` is denied.
+3. Existing farmer and observation row counts remain unchanged.
+4. A new farmer registration inserts successfully with a consent timestamp.
+5. A new field observation still inserts successfully.
+6. The public dashboard does not download existing personal records.
+7. Supabase security advisors are rerun; remaining findings are reviewed.
 
 ## Admin reporting
 
