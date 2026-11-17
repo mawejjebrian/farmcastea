@@ -1,6 +1,6 @@
 // Private FARMCAST EA WhatsApp administration API.
 // Required Vercel environment variables:
-// SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY,
+// SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SECRET_KEY (preferred) or SUPABASE_SERVICE_ROLE_KEY,
 // FARMCAST_ADMIN_EMAILS (comma-separated exact email allowlist),
 // WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_API_VERSION.
 const json = (res, status, body) => res.status(status).json(body);
