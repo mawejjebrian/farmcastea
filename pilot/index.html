@@ -253,10 +253,14 @@
             </div>
           </div>
 
-          <div class="p-3 bg-gray-50 rounded-xl border border-gray-200">
+          <div class="p-3 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
             <label class="flex items-start space-x-2 text-xs text-gray-600 cursor-pointer">
-              <input type="checkbox" id="reg-consent" required class="mt-0.5 rounded text-green-700 focus:ring-green-600">
-              <span>I voluntarily consent to receiving weather forecasts, advisories, and study surveys via WhatsApp. I can opt-out anytime by typing <strong>STOP</strong>.</span>
+              <input type="checkbox" id="reg-data-consent" required class="mt-0.5 rounded text-green-700 focus:ring-green-600">
+              <span>I agree that FARMCAST EA may store and use my details to administer my registration and improve farmer services. I may request correction or deletion.</span>
+            </label>
+            <label class="flex items-start space-x-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" id="reg-consent" class="mt-0.5 rounded text-green-700 focus:ring-green-600">
+              <span>I separately agree to receive weather forecasts and farming updates via WhatsApp. This is optional and I can opt out at any time.</span>
             </label>
           </div>
 
@@ -547,15 +551,17 @@
       const crop = document.getElementById('reg-crop').value;
       const phone = document.getElementById('reg-phone').value.trim();
       const lang = document.getElementById('reg-lang').value;
-      const consent = document.getElementById('reg-consent').checked;
+      const dataConsent = document.getElementById('reg-data-consent').checked;
+      const whatsappConsent = document.getElementById('reg-consent').checked;
       const btn = document.getElementById('reg-btn'), status = document.getElementById('reg-status');
       btn.disabled = true; btn.innerText = 'Saving Registration…';
       if (!supabaseClient) { status.textContent = 'Database is not configured. Your details were not stored.'; btn.disabled=false; btn.innerText='Complete Registration'; return; }
       const farmerCode = 'FEA-WAK-' + Date.now().toString().slice(-8);
-      const { error } = await supabaseClient.from('farmers').insert([{farmer_code:farmerCode,full_name:name,sub_county:loc,crop,phone_number:phone,preferred_language:lang,whatsapp_consent:consent}]);
+      if (!dataConsent) { status.textContent='Please agree to the registration data notice.'; btn.disabled=false; btn.innerText='Complete Registration'; return; }
+      const { error } = await supabaseClient.from('farmers').insert([{farmer_code:farmerCode,full_name:name,sub_county:loc,crop,phone_number:phone,preferred_language:lang,whatsapp_consent:whatsappConsent,registration_consent_at:new Date().toISOString()}]);
       if (error) { console.error('Registration save failed:',error); status.textContent='Registration was not saved. Please retry later.'; btn.disabled=false; btn.innerText='Complete Registration'; return; }
       setDbStatus('DB Connected','connected');
-      pilotState.farmers.push({id:farmerCode,name,loc,crop,lang,phone,whatsapp_consent:consent});
+      pilotState.farmers.push({id:farmerCode,name,loc,crop,lang,phone,whatsapp_consent:whatsappConsent});
       document.getElementById('assigned-farmer-id').innerText=farmerCode; document.getElementById('reg-success').classList.remove('hidden');
       document.getElementById('pilot-reg-form').reset(); status.textContent='Registration saved successfully.'; btn.disabled=false; btn.innerText='Complete Registration'; renderDashboard();
     }
