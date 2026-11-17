@@ -1,5 +1,5 @@
 -- FARMCAST EA farmer registration privacy and consent hardening
--- Apply only after the privacy-safe application in PR #6 is deployed.
+-- Apply only after the privacy-safe application in PR #7 is deployed.
 -- Preserves all existing farmer and observation records.
 
 begin;
