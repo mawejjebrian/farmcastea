@@ -52,6 +52,7 @@ function eligibleQuery() {
   return new URLSearchParams({
     select: "id,farmer_code,full_name,phone_number,sub_county,crop,preferred_language,registration_consent_at,created_at",
     whatsapp_consent: "eq.true",
+    registration_consent_at: "not.is.null",
     order: "created_at.asc",
     limit: "1000"
   }).toString();
