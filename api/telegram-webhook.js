@@ -37,15 +37,20 @@ async function upsertPending(chat, from) {
   };
   await db("telegram_subscriptions?on_conflict=chat_id", "POST", row, "resolution=merge-duplicates,return=minimal");
 }
-async function setStatus(chatId, status) {
+async function setStatus(chatId, telegramUserId, status) {
   const now = new Date().toISOString();
   const patch = status === "active"
     ? { status: "active", consent_at: now, opted_out_at: null, updated_at: now }
     : { status: "unsubscribed", opted_out_at: now, updated_at: now };
-  await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)), "PATCH", patch, "return=minimal");
+  const query = "chat_id=eq." + enc(String(chatId)) +
+    "&telegram_user_id=eq." + enc(String(telegramUserId)) + "&status=eq.pending";
+  await db("telegram_subscriptions?" + query, "PATCH", patch, "return=minimal");
+  const rows = await db("telegram_subscriptions?select=status&" + query.replace("&status=eq.pending", ""));
+  return !!(rows && rows[0] && rows[0].status === status);
 }
-async function isAlreadyActive(chatId) {
-  const rows = await db("telegram_subscriptions?select=status&chat_id=eq." + enc(String(chatId)));
+async function isAlreadyActive(chatId, telegramUserId) {
+  const query = "chat_id=eq." + enc(String(chatId)) + "&telegram_user_id=eq." + enc(String(telegramUserId));
+  const rows = await db("telegram_subscriptions?select=status&" + query);
   return !!(rows && rows[0] && rows[0].status === "active");
 }
 async function sendConsent(chatId) {
@@ -67,31 +72,43 @@ export default async function handler(req, res) {
     const update = req.body || {};
     if (update.callback_query) {
       const cb = update.callback_query;
-      const chatId = cb.message && cb.message.chat && cb.message.chat.id;
-      if (!chatId) return json(res, 200, { ok: true });
-      if (cb.data === "farmcast_consent_yes") {
-        await setStatus(chatId, "active");
-        await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "Subscription confirmed." });
-        await telegram("sendMessage", { chat_id: chatId, text: "You are subscribed to FARMCAST EA Telegram updates. Use /stop at any time to unsubscribe. Set your preferences with /country Uganda and /crop maize." });
-      } else if (cb.data === "farmcast_consent_no") {
-        await setStatus(chatId, "unsubscribed");
-        await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "No subscription was created." });
-        await telegram("sendMessage", { chat_id: chatId, text: "No problem. You will not receive FARMCAST EA Telegram broadcasts. You can use /start if you change your mind." });
+      const chat = cb.message && cb.message.chat;
+      const chatId = chat && chat.id;
+      const userId = cb.from && cb.from.id;
+      if (!chatId || !userId || chat.type !== "private") {
+        await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "Please subscribe in a private chat with FARMCAST EA." });
+        return json(res, 200, { ok: true });
+      }
+      if (cb.data === "farmcast_consent_yes" || cb.data === "farmcast_consent_no") {
+        const nextStatus = cb.data === "farmcast_consent_yes" ? "active" : "unsubscribed";
+        const changed = await setStatus(chatId, userId, nextStatus);
+        if (!changed) {
+          await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "This consent request is no longer active.", show_alert: true });
+          return json(res, 200, { ok: true });
+        }
+        if (nextStatus === "active") {
+          await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "Subscription confirmed." });
+          await telegram("sendMessage", { chat_id: chatId, text: "You are subscribed to FARMCAST EA Telegram updates. Use /stop at any time to unsubscribe. Set your preferences with /country Uganda and /crop maize." });
+        } else {
+          await telegram("answerCallbackQuery", { callback_query_id: cb.id, text: "No subscription was created." });
+          await telegram("sendMessage", { chat_id: chatId, text: "No problem. You will not receive FARMCAST EA Telegram broadcasts. You can use /start if you change your mind." });
+        }
       }
       return json(res, 200, { ok: true });
     }
     const message = update.message;
     if (!message || !message.chat || !message.from || typeof message.text !== "string") return json(res, 200, { ok: true });
-    const chatId = message.chat.id, text = message.text.trim();
+    if (message.chat.type !== "private") return json(res, 200, { ok: true });
+    const chatId = message.chat.id, userId = message.from.id, text = message.text.trim();
     if (/^\/start(?:\s|$)/i.test(text)) {
-      if (await isAlreadyActive(chatId)) {
+      if (await isAlreadyActive(chatId, userId)) {
         await telegram("sendMessage", { chat_id: chatId, text: "You are already subscribed. Use /stop at any time to unsubscribe." });
       } else {
         await upsertPending(message.chat, message.from);
         await sendConsent(chatId);
       }
     } else if (/^\/stop(?:\s|$)/i.test(text)) {
-      await setStatus(chatId, "unsubscribed");
+      await setStatus(chatId, userId, "unsubscribed");
       await telegram("sendMessage", { chat_id: chatId, text: "You have unsubscribed from FARMCAST EA Telegram updates. Use /start if you want to subscribe again." });
     } else if (/^\/country(?:\s|$)/i.test(text)) {
       const value = text.replace(/^\/country\s*/i, "").trim();
