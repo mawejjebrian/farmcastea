@@ -44,7 +44,7 @@ async function setStatus(chatId, status) {
     : { status: "unsubscribed", opted_out_at: now, updated_at: now };
   await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)), "PATCH", patch, "return=minimal");
 }
-async function sendConsent(chatId) {
+async function isAlreadyActive(chatId) {\n  const rows = await db("telegram_subscriptions?select=status&chat_id=eq." + enc(String(chatId)));\n  return !!(rows && rows[0] && rows[0].status === "active");\n}\nasync function sendConsent(chatId) {
   await telegram("sendMessage", {
     chat_id: chatId,
     text: "Welcome to FARMCAST EA. We share practical weather, climate and farming updates. You will receive messages only if you choose to subscribe here. Your WhatsApp preferences do not subscribe you to Telegram. Do you agree to receive FARMCAST EA Telegram updates?",
