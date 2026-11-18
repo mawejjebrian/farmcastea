@@ -85,9 +85,31 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "GET, POST");
     return json(res, 405, { error: "Method not allowed." });
   }
-  const cronSecret = env("CRON_SECRET");
-  const supplied = String(req.headers.authorization || "");
-  if (!cronSecret || supplied !== "Bearer " + cronSecret) return json(res, 401, { error: "Unauthorized." });
+  const timestamp = String(req.headers["x-timestamp"] || "");
+  const signature = String(req.headers["x-signature"] || "");
+  const signingSecret = env("WEATHER_ALERT_HMAC_SECRET");
+  const timestampSeconds = Number(timestamp);
+  if (!signingSecret || !/^\\d{10}$/.test(timestamp) ||
+      !Number.isFinite(timestampSeconds) ||
+      Math.abs(Date.now() - timestampSeconds * 1000) > 5 * 60 * 1000 ||
+      !/^[a-f0-9]{64}$/i.test(signature)) {
+    return json(res, 401, { error: "Unauthorized." });
+  }
+  const payloadText = JSON.stringify(req.body || {});
+  const hmacKey = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(signingSecret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const digest = await crypto.subtle.sign(
+    "HMAC", hmacKey, new TextEncoder().encode(timestamp + "." + payloadText)
+  );
+  const expectedSignature = Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, "0")).join("");
+  let signatureDifference = expectedSignature.length ^ signature.length;
+  for (let i = 0; i < Math.min(expectedSignature.length, signature.length); i++) {
+    signatureDifference |= expectedSignature.charCodeAt(i) ^ signature.toLowerCase().charCodeAt(i);
+  }
+  if (signatureDifference !== 0) return json(res, 401, { error: "Unauthorized." });
 
   try {
     if (!env("TELEGRAM_BOT_TOKEN") || !serviceKey() || !env("SUPABASE_URL")) {
