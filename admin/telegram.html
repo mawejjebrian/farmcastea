@@ -37,7 +37,7 @@
 <div id="previewBox" class="hidden">
 <div class="stats"><div class="stat"><strong id="eligibleCount">0</strong><span class="muted">Eligible subscribers</span></div><div class="stat"><strong id="sentCount">0</strong><span class="muted">Sent this session</span></div><div class="stat"><strong id="failedCount">0</strong><span class="muted">Failed this session</span></div></div>
 <p id="previewStatus" class="status" role="status"></p>
-<button id="sendBtn" onclick="sendNext()">Send first / next batch (max 20)</button>
+<button id="sendBtn" onclick="sendNext()">Send first / next batch (max 10)</button>
 </div>
 <p id="sendStatus" class="status" role="status">No messages have been sent.</p>
 </section>
@@ -93,7 +93,7 @@ async function sendNext(){
  if(finished||!filtersLocked)return;
  const message=el("message").value.trim();
  if(!message||message.length>3500){el("sendStatus").textContent="Check your message before sending.";return;}
- const remaining=Math.max(0,eligible-offset),n=Math.min(20,remaining);
+ const remaining=Math.max(0,eligible-offset),n=Math.min(10,remaining);
  if(!confirm("Send this message to the next "+n+" of "+eligible+" eligible Telegram subscribers? This action cannot be recalled."))return;
  el("sendBtn").disabled=true;el("sendStatus").textContent="Sending this batch…";
  try{
