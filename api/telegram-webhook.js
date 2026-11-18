@@ -42,11 +42,11 @@ async function setStatus(chatId, telegramUserId, status) {
   const patch = status === "active"
     ? { status: "active", consent_at: now, opted_out_at: null, updated_at: now }
     : { status: "unsubscribed", opted_out_at: now, updated_at: now };
+  const stateFilter = status === "active" ? "&status=eq.pending" : "&status=in.(pending,active)";
   const query = "chat_id=eq." + enc(String(chatId)) +
-    "&telegram_user_id=eq." + enc(String(telegramUserId)) + "&status=eq.pending";
-  await db("telegram_subscriptions?" + query, "PATCH", patch, "return=minimal");
-  const rows = await db("telegram_subscriptions?select=status&" + query.replace("&status=eq.pending", ""));
-  return !!(rows && rows[0] && rows[0].status === status);
+    "&telegram_user_id=eq." + enc(String(telegramUserId)) + stateFilter;
+  const rows = await db("telegram_subscriptions?" + query, "PATCH", patch, "return=representation");
+  return Array.isArray(rows) && rows.length > 0;
 }
 async function isAlreadyActive(chatId, telegramUserId) {
   const query = "chat_id=eq." + enc(String(chatId)) + "&telegram_user_id=eq." + enc(String(telegramUserId));
