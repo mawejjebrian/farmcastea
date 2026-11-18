@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     }
     if (body.action === "set_webhook") {
       const webhookSecret = env("TELEGRAM_WEBHOOK_SECRET");
-      if (!webhookSecret || webhookSecret.length < 32) return json(res, 400, { error: "Set a random TELEGRAM_WEBHOOK_SECRET of at least 32 characters in Vercel Production first." });
+      if (!webhookSecret || webhookSecret.length < 32 || !/^[A-Za-z0-9_-]+$/.test(webhookSecret)) return json(res, 400, { error: "Set a random TELEGRAM_WEBHOOK_SECRET of at least 32 characters in Vercel Production first." });
       const result = await telegram("setWebhook", {
         url: "https://farmcastea.vercel.app/api/telegram-webhook",
         secret_token: webhookSecret,
@@ -77,12 +77,12 @@ export default async function handler(req, res) {
         count += rows.length;
         if (rows.length < 1000) break;
       }
-      return json(res, 200, { eligible: count, country: body.country || null, crop: body.crop || null, max_per_click: 20 });
+      return json(res, 200, { eligible: count, country: body.country || null, crop: body.crop || null, max_per_click: 10 });
     }
     if (body.action === "send_batch") {
       if (!message || message.length > 3500) return json(res, 400, { error: "Message must contain 1–3500 characters." });
       const offset = Number.isInteger(body.offset) && body.offset >= 0 ? Math.min(body.offset, 100000) : 0;
-      const rows = await db("telegram_subscriptions?" + query.toString(), "GET", undefined, "", offset + "-" + (offset + 19));
+      const rows = await db("telegram_subscriptions?" + query.toString(), "GET", undefined, "", offset + "-" + (offset + 9));
       if (!rows.length) return json(res, 200, { sent: 0, failed: 0, next_offset: offset, done: true });
       const batchId = crypto.randomUUID();
       let sent = 0, failed = 0;
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
         } catch (logError) { console.error("Telegram delivery log write failed:", logError.message); }
         if (failure) failed++; else sent++;
       }
-      return json(res, 200, { batch_id: batchId, sent, failed, next_offset: offset + rows.length, done: rows.length < 20 });
+      return json(res, 200, { batch_id: batchId, sent, failed, next_offset: offset + rows.length, done: rows.length < 10 });
     }
     return json(res, 400, { error: "Unknown action." });
   } catch (error) {
