@@ -53,6 +53,10 @@ export default async function handler(req, res) {
   if (!await requireAdmin(req)) return json(res, 401, { error: "Sign in with an approved FARMCAST EA administrator account." });
   try {
     const body = req.body || {};
+    if (body.action === "recent_logs") {
+      const rows = await db("telegram_delivery_logs?select=created_at,status,error_code,telegram_message_id&order=created_at.desc&limit=30");
+      return json(res, 200, { logs: rows || [] });
+    }
     if (body.action === "webhook_info") {
       const info = await telegram("getWebhookInfo");
       return json(res, 200, { url: info.url || "", pending_update_count: info.pending_update_count || 0, last_error_date: info.last_error_date || null, last_error_message: info.last_error_message || null });
