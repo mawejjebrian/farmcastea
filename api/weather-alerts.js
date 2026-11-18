@@ -1,4 +1,4 @@
-// Vercel Cron endpoint: six-hourly, consent-first, test-only weather alerts.
+// Supabase Cron-triggered endpoint: 12-hourly, consent-first, test-only weather alerts.
 const env = (name) => (process.env[name] || "").trim();
 const base = () => env("SUPABASE_URL").replace(/\/$/, "");
 const serviceKey = () => env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
