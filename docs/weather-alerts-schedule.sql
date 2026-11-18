@@ -17,11 +17,14 @@ begin
   -- Replace any previous job with the same name to avoid duplicate sends.
   perform cron.unschedule(jobid)
   from cron.job
-  where jobname = 'farmcast-weather-alerts-every-six-hours';
+  where jobname in (
+    'farmcast-weather-alerts-every-six-hours',
+    'farmcast-weather-alerts-every-twelve-hours'
+  );
 
   select cron.schedule(
-    'farmcast-weather-alerts-every-six-hours',
-    '0 */6 * * *',
+    'farmcast-weather-alerts-every-twelve-hours',
+    '0 */12 * * *',
     $job$
     do $inner$
     declare
