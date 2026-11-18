@@ -1,0 +1,11 @@
+# Client-side placeholders only. Never put server secrets in VITE_* variables.
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+
+# Server-side Vercel Production variables (set in the dashboard; do not commit values):
+# SUPABASE_URL=
+# SUPABASE_ANON_KEY=
+# SUPABASE_SECRET_KEY=  (preferred) OR SUPABASE_SERVICE_ROLE_KEY=
+# FARMCAST_ADMIN_EMAILS=
+# TELEGRAM_BOT_TOKEN=
+# TELEGRAM_WEBHOOK_SECRET=  (unique random string, 32+ characters)
