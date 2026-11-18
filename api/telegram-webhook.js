@@ -108,9 +108,11 @@ export default async function handler(req, res) {
     return json(res, 401, { error: "Unauthorized webhook." });
   }
 
+  let receivedUpdateId = null;
   try {
     const update = req.body && typeof req.body === "object" ? req.body : {};
     if (!Number.isSafeInteger(update.update_id)) return json(res, 200, { ok: true });
+    receivedUpdateId = update.update_id;
 
     // Telegram may retry webhooks. Process each update only once.
     const accepted = await database(
@@ -179,6 +181,14 @@ export default async function handler(req, res) {
 
     return json(res, 200, { ok: true });
   } catch (error) {
+    // Release the idempotency claim after a failed operation so Telegram can retry.
+    if (receivedUpdateId !== null) {
+      try {
+        await database("telegram_updates?update_id=eq." + encodeURIComponent(receivedUpdateId), "DELETE");
+      } catch {
+        console.error("FARMCAST EA Telegram retry marker cleanup failed.");
+      }
+    }
     console.error("FARMCAST EA Telegram webhook error:", error.status || "processing_error");
     return json(res, 500, { error: "Webhook processing failed." });
   }
