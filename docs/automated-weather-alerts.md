@@ -1,7 +1,7 @@
 # FARMCAST EA automated weather alerts (test mode)
 
 ## What this release does
-- Vercel Cron calls `/api/weather-alerts` every six hours (UTC schedule).
+- Supabase Cron (`pg_cron`) calls `/api/weather-alerts` every six hours. Vercel Hobby plans do not support a six-hour Vercel Cron schedule.
 - The endpoint fetches a three-day forecast from Open-Meteo.
 - It detects heavy rainfall (at least 30 mm/day), high heat (at least 35°C), and a three-day low-rainfall period.
 - It sends practical advice only when a threshold is reached.
@@ -17,7 +17,13 @@ Existing variables are reused:
 - `TELEGRAM_BOT_TOKEN`
 
 Add one new server-only variable:
-- `CRON_SECRET`: a private random value of at least 32 characters. Vercel Cron sends it as an Authorization Bearer token. Do not paste it into chat or commit it.
+- `WEATHER_ALERT_HMAC_SECRET`: a private random value of at least 32 characters. Store the same value in Supabase Vault as `farmcast_weather_alert_hmac_secret`. The database sends only an HMAC signature, never the secret itself. Do not paste it into chat or commit it.
+
+## Supabase scheduler setup
+1. Apply `supabase/migrations/202611180003_weather_alert_scheduler_extensions.sql` to enable `pg_cron` and `pg_net`.
+2. In Supabase Dashboard → Integrations → Vault, create a secret named `farmcast_weather_alert_hmac_secret` with the exact same value as Vercel's `WEATHER_ALERT_HMAC_SECRET`.
+3. Run the scheduling SQL in `docs/weather-alerts-schedule.sql` once. It creates a six-hour job that signs each request with HMAC SHA-256 and calls the Vercel endpoint.
+4. Check Integrations → Cron and confirm the job is enabled.
 
 Do not use a `NEXT_PUBLIC_` or `VITE_` prefix for secrets.
 
