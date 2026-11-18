@@ -44,7 +44,10 @@ async function setStatus(chatId, status) {
     : { status: "unsubscribed", opted_out_at: now, updated_at: now };
   await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)), "PATCH", patch, "return=minimal");
 }
-async function isAlreadyActive(chatId) {\n  const rows = await db("telegram_subscriptions?select=status&chat_id=eq." + enc(String(chatId)));\n  return !!(rows && rows[0] && rows[0].status === "active");\n}\nasync function sendConsent(chatId) {
+async function isAlreadyActive(chatId) {
+  const rows = await db("telegram_subscriptions?select=status&chat_id=eq." + enc(String(chatId)));
+  return !!(rows && rows[0] && rows[0].status === "active");
+}\nasync function sendConsent(chatId) {
   await telegram("sendMessage", {
     chat_id: chatId,
     text: "Welcome to FARMCAST EA. We share practical weather, climate and farming updates. You will receive messages only if you choose to subscribe here. Your WhatsApp preferences do not subscribe you to Telegram. Do you agree to receive FARMCAST EA Telegram updates?",
@@ -80,8 +83,12 @@ export default async function handler(req, res) {
     if (!message || !message.chat || !message.from || typeof message.text !== "string") return json(res, 200, { ok: true });
     const chatId = message.chat.id, text = message.text.trim();
     if (/^\/start(?:\s|$)/i.test(text)) {
-      await upsertPending(message.chat, message.from);
-      await sendConsent(chatId);
+      if (await isAlreadyActive(chatId)) {
+        await telegram("sendMessage", { chat_id: chatId, text: "You are already subscribed. Use /stop at any time to unsubscribe." });
+      } else {
+        await upsertPending(message.chat, message.from);
+        await sendConsent(chatId);
+      }
     } else if (/^\/stop(?:\s|$)/i.test(text)) {
       await setStatus(chatId, "unsubscribed");
       await telegram("sendMessage", { chat_id: chatId, text: "You have unsubscribed from FARMCAST EA Telegram updates. Use /start if you want to subscribe again." });
