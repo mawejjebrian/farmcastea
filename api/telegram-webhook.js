@@ -114,14 +114,14 @@ export default async function handler(req, res) {
       const value = text.replace(/^\/country\s*/i, "").trim();
       if (!value || value.length > 80) await telegram("sendMessage", { chat_id: chatId, text: "Send your country like this: /country Uganda" });
       else {
-        await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)) + "&status=eq.active", "PATCH", { country: value, updated_at: new Date().toISOString() }, "return=minimal");
+        await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)) + "&telegram_user_id=eq." + enc(String(userId)) + "&status=eq.active", "PATCH", { country: value, updated_at: new Date().toISOString() }, "return=minimal");
         await telegram("sendMessage", { chat_id: chatId, text: "Country preference updated if you are subscribed." });
       }
     } else if (/^\/crop(?:\s|$)/i.test(text)) {
       const value = text.replace(/^\/crop\s*/i, "").trim();
       if (!value || value.length > 60) await telegram("sendMessage", { chat_id: chatId, text: "Send your main crop like this: /crop maize" });
       else {
-        await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)) + "&status=eq.active", "PATCH", { crop: value, updated_at: new Date().toISOString() }, "return=minimal");
+        await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)) + "&telegram_user_id=eq." + enc(String(userId)) + "&status=eq.active", "PATCH", { crop: value, updated_at: new Date().toISOString() }, "return=minimal");
         await telegram("sendMessage", { chat_id: chatId, text: "Crop preference updated if you are subscribed." });
       }
     } else if (/^\/help(?:\s|$)/i.test(text)) {
