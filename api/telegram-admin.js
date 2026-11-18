@@ -18,13 +18,48 @@ async function db(path, method = "GET", body, prefer = "", range = "") {
 }
 async function requireAdmin(req) {
   const auth = req.headers.authorization || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  if (!token || !env("SUPABASE_URL") || !env("SUPABASE_ANON_KEY") || !secretKey()) return false;
-  const response = await fetch(base() + "/auth/v1/user", { headers: { apikey: env("SUPABASE_ANON_KEY"), Authorization: "Bearer " + token } });
-  if (!response.ok) return false;
-  const user = await response.json();
-  const allowed = env("FARMCAST_ADMIN_EMAILS").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
-  return !!user.email && user.email_confirmed_at != null && allowed.includes(user.email.toLowerCase());
+  const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  const authApiKey = env("SUPABASE_PUBLISHABLE_KEY") || env("SUPABASE_ANON_KEY") || secretKey();
+  const required = {
+    SUPABASE_URL: env("SUPABASE_URL"),
+    SUPABASE_AUTH_API_KEY: authApiKey,
+    SUPABASE_SERVER_SECRET: secretKey(),
+    FARMCAST_ADMIN_EMAILS: env("FARMCAST_ADMIN_EMAILS")
+  };
+  const missing = Object.entries(required).filter(([, value]) => !value).map(([name]) => name);
+  if (!token || missing.length) {
+    console.error("Telegram admin auth configuration missing:", missing.length ? missing.join(", ") : "bearer token");
+    return false;
+  }
+
+  let response;
+  try {
+    response = await fetch(base() + "/auth/v1/user", {
+      headers: { apikey: authApiKey, Authorization: "Bearer " + token }
+    });
+  } catch (error) {
+    console.error("Telegram admin Supabase Auth request failed:", error.message);
+    return false;
+  }
+  if (!response.ok) {
+    console.warn("Telegram admin Supabase Auth rejected the session:", response.status);
+    return false;
+  }
+
+  let user;
+  try {
+    user = await response.json();
+  } catch {
+    console.warn("Telegram admin Supabase Auth returned an unreadable user response.");
+    return false;
+  }
+  const allowed = required.FARMCAST_ADMIN_EMAILS.split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+  const email = String(user.email || "").trim().toLowerCase();
+
+  // The allowlist is the administrator authorization boundary. Do not add an
+  // email-confirmation gate here: projects may explicitly allow unverified
+  // email sign-ins, and Supabase already enforces the project's Auth policy.
+  return !!email && allowed.includes(email);
 }
 function filters(body, snapshotAt, cursor) {
   const q = new URLSearchParams({ select: "id,chat_id,country,crop,preferred_language,created_at", status: "eq.active", order: "created_at.asc,id.asc" });
