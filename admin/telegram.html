@@ -41,6 +41,10 @@
 </div>
 <p id="sendStatus" class="status" role="status">No messages have been sent.</p>
 </section>
+<section class="panel">
+<div class="topline"><div><h2>Recent delivery activity</h2><p class="muted">Latest 30 delivery attempts. Subscriber chat IDs are not displayed here.</p></div><button class="secondary" onclick="refreshLogs()">Refresh logs</button></div>
+<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:8px">Time</th><th style="text-align:left;padding:8px">Status</th><th style="text-align:left;padding:8px">Telegram message ID</th><th style="text-align:left;padding:8px">Error</th></tr></thead><tbody id="logRows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+</section>
 </div>
 </main>
 <script>
@@ -62,7 +66,7 @@ async function signIn(){
  catch(e){el("loginStatus").textContent=e.message||"Sign-in failed.";}
  finally{el("loginBtn").disabled=false;}
 }
-function showWorkspace(){el("login").classList.add("hidden");el("workspace").classList.remove("hidden");checkBot();}
+function showWorkspace(){el("login").classList.add("hidden");el("workspace").classList.remove("hidden");checkBot();refreshLogs();}
 async function signOut(){await sb.auth.signOut();el("workspace").classList.add("hidden");el("login").classList.remove("hidden");}
 function currentFilters(){return {country:el("country").value.trim(),crop:el("crop").value.trim()};}
 async function connectBot(){
@@ -70,6 +74,14 @@ async function connectBot(){
  try{const result=await api({action:"set_webhook"});el("connectionStatus").textContent=result.connected?"Webhook connected: "+result.url:"Telegram did not confirm the webhook.";}
  catch(e){el("connectionStatus").textContent=e.message;}
  finally{el("connectBtn").disabled=false;}
+}
+async function refreshLogs(){
+ const body=el("logRows");body.replaceChildren();
+ try{
+  const r=await api({action:"recent_logs"});
+  if(!r.logs.length){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=4;td.textContent="No Telegram deliveries logged yet.";tr.appendChild(td);body.appendChild(tr);return;}
+  r.logs.forEach(log=>{const tr=document.createElement("tr");[new Date(log.created_at).toLocaleString(),log.status,log.telegram_message_id||"—",log.error_code||"—"].forEach(value=>{const td=document.createElement("td");td.style.padding="8px";td.textContent=value;tr.appendChild(td);});body.appendChild(tr);});
+ }catch(e){const tr=document.createElement("tr"),td=document.createElement("td");td.colSpan=4;td.textContent=e.message;tr.appendChild(td);body.appendChild(tr);}
 }
 async function checkBot(){
  el("connectionStatus").textContent="Checking Telegram webhook…";
