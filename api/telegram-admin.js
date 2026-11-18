@@ -27,9 +27,10 @@ async function requireAdmin(req) {
     FARMCAST_ADMIN_EMAILS: env("FARMCAST_ADMIN_EMAILS")
   };
   const missing = Object.entries(required).filter(([, value]) => !value).map(([name]) => name);
-  if (!token || missing.length) {
-    console.error("Telegram admin auth configuration missing:", missing.length ? missing.join(", ") : "bearer token");
-    return false;
+  if (!token) return { ok: false, reason: "missing_session" };
+  if (missing.length) {
+    console.error("Telegram admin auth configuration missing:", missing.join(", "));
+    return { ok: false, reason: "missing_server_configuration" };
   }
 
   let response;
@@ -39,27 +40,24 @@ async function requireAdmin(req) {
     });
   } catch (error) {
     console.error("Telegram admin Supabase Auth request failed:", error.message);
-    return false;
+    return { ok: false, reason: "supabase_auth_unreachable" };
   }
   if (!response.ok) {
-    console.warn("Telegram admin Supabase Auth rejected the session:", response.status);
-    return false;
+    console.warn("Telegram admin Supabase Auth rejected session:", response.status);
+    return { ok: false, reason: "supabase_session_rejected", status: response.status };
   }
 
   let user;
   try {
     user = await response.json();
   } catch {
-    console.warn("Telegram admin Supabase Auth returned an unreadable user response.");
-    return false;
+    return { ok: false, reason: "invalid_supabase_user_response" };
   }
   const allowed = required.FARMCAST_ADMIN_EMAILS.split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
   const email = String(user.email || "").trim().toLowerCase();
-
-  // The allowlist is the administrator authorization boundary. Do not add an
-  // email-confirmation gate here: projects may explicitly allow unverified
-  // email sign-ins, and Supabase already enforces the project's Auth policy.
-  return !!email && allowed.includes(email);
+  if (!email) return { ok: false, reason: "supabase_user_has_no_email" };
+  if (!allowed.includes(email)) return { ok: false, reason: "administrator_email_not_allowlisted" };
+  return { ok: true };
 }
 function filters(body, snapshotAt, cursor) {
   const q = new URLSearchParams({ select: "id,chat_id,country,crop,preferred_language,created_at", status: "eq.active", order: "created_at.asc,id.asc" });
@@ -87,7 +85,19 @@ async function telegram(method, payload) {
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") { res.setHeader("Allow", "POST"); return json(res, 405, { error: "Method not allowed." }); }
-  if (!await requireAdmin(req)) return json(res, 401, { error: "Sign in with an approved FARMCAST EA administrator account." });
+  const authorization = await requireAdmin(req);
+  if (!authorization.ok) {
+    const messages = {
+      missing_session: "Your administrator session is missing. Sign out and sign in again.",
+      missing_server_configuration: "Telegram admin server configuration is incomplete. Check the Vercel Production environment variables.",
+      supabase_auth_unreachable: "FARMCAST EA could not reach Supabase Auth. Check the production function logs.",
+      supabase_session_rejected: "Supabase rejected this sign-in session (HTTP " + authorization.status + "). Sign out and sign in again.",
+      invalid_supabase_user_response: "Supabase returned an invalid administrator profile.",
+      supabase_user_has_no_email: "The signed-in Supabase account has no email address.",
+      administrator_email_not_allowlisted: "This email is not in FARMCAST_ADMIN_EMAILS. Add the exact signed-in email to the Vercel Production allowlist."
+    };
+    return json(res, 401, { error: messages[authorization.reason] || "Administrator authorization failed.", diagnostic: authorization.reason });
+  }
   try {
     const body = req.body || {};
     if (body.action === "recent_logs") {
