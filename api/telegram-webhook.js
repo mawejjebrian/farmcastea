@@ -29,13 +29,35 @@ async function telegram(method, payload) {
 }
 const enc = encodeURIComponent;
 async function upsertPending(chat, from) {
-  const row = {
-    chat_id: String(chat.id), telegram_user_id: String(from.id),
+  const chatId = String(chat.id);
+  const userId = String(from.id);
+  const now = new Date().toISOString();
+  const profile = {
+    telegram_user_id: userId,
     username: from.username ? String(from.username).slice(0, 64) : null,
     first_name: from.first_name ? String(from.first_name).slice(0, 100) : null,
-    status: "pending", consent_at: null, opted_out_at: null, updated_at: new Date().toISOString()
+    updated_at: now
   };
-  await db("telegram_subscriptions?on_conflict=chat_id", "POST", row, "resolution=merge-duplicates,return=minimal");
+
+  // Never overwrite an active subscription, even if two /start updates race.
+  // Re-open only pending or previously unsubscribed rows.
+  const updated = await db(
+    "telegram_subscriptions?chat_id=eq." + enc(chatId) +
+      "&telegram_user_id=eq." + enc(userId) + "&status=in.(pending,unsubscribed)",
+    "PATCH",
+    { ...profile, status: "pending", consent_at: null, opted_out_at: null },
+    "return=representation"
+  );
+  if (Array.isArray(updated) && updated.length > 0) return;
+
+  // If no row exists, insert without replacing a row created concurrently.
+  // resolution=ignore-duplicates ensures a concurrent active row remains active.
+  await db(
+    "telegram_subscriptions?on_conflict=chat_id",
+    "POST",
+    { chat_id: chatId, ...profile, status: "pending", consent_at: null, opted_out_at: null },
+    "resolution=ignore-duplicates,return=minimal"
+  );
 }
 async function setStatus(chatId, telegramUserId, status) {
   const now = new Date().toISOString();
