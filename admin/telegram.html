@@ -52,7 +52,7 @@ const SUPABASE_URL="https://fneugfsorgwkicmxmieo.supabase.co";
 const SUPABASE_KEY="sb_publishable_pCsSfzfxu1WO-w07z32I3A_jcXT4TiW";
 const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=id=>document.getElementById(id);
-let eligible=0,processedTotal=0,sentTotal=0,failedTotal=0,filtersLocked=null,snapshotAt=null,cursor=null,finished=true;
+let eligible=0,processedTotal=0,sentTotal=0,failedTotal=0,filtersLocked=null,messageLocked=null,snapshotAt=null,cursor=null,finished=true,hasSentAny=false;
 el("message").addEventListener("input",()=>el("charCount").textContent=el("message").value.length);
 async function api(payload){
  const {data:{session}}=await sb.auth.getSession();
@@ -90,10 +90,11 @@ async function checkBot(){
 }
 async function preview(){
  const message=el("message").value.trim();if(!message){el("sendStatus").textContent="Write a message before previewing.";return;}
+ if(hasSentAny&&!confirm("Starting a new preview resets broadcast progress and may send to the same subscribers again. Continue?"))return;
  el("previewBtn").disabled=true;
  try{
   const f=currentFilters(),r=await api({action:"preview",...f});
-  filtersLocked=f;snapshotAt=r.snapshot_at;cursor=null;eligible=r.eligible;processedTotal=0;sentTotal=0;failedTotal=0;finished=eligible===0;
+  filtersLocked=f;messageLocked=message;snapshotAt=r.snapshot_at;cursor=null;eligible=r.eligible;processedTotal=0;sentTotal=0;failedTotal=0;finished=eligible===0;hasSentAny=false;
   el("eligibleCount").textContent=eligible;el("sentCount").textContent="0";el("failedCount").textContent="0";
   el("previewStatus").textContent="Preview: "+eligible+" active Telegram subscribers"+(f.country?" in "+f.country:"")+(f.crop?" for "+f.crop:"")+". No messages have been sent.";
   el("previewBox").classList.remove("hidden");el("sendBtn").disabled=finished;
@@ -105,12 +106,16 @@ async function sendNext(){
  if(finished||!filtersLocked)return;
  const message=el("message").value.trim();
  if(!message||message.length>3500){el("sendStatus").textContent="Check your message before sending.";return;}
+ if(message!==messageLocked||JSON.stringify(currentFilters())!==JSON.stringify(filtersLocked)){
+  el("sendStatus").textContent="The message or filters changed. Preview again before sending.";
+  el("sendBtn").disabled=true;return;
+ }
  const remaining=Math.max(0,eligible-processedTotal),n=Math.min(10,remaining);
  if(!confirm("Send this message to up to "+n+" of "+eligible+" eligible Telegram subscribers? This action cannot be recalled."))return;
  el("sendBtn").disabled=true;el("sendStatus").textContent="Sending this batch…";
  try{
   const r=await api({action:"send_batch",...filtersLocked,message,snapshot_at:snapshotAt,cursor});
-  cursor=r.next_cursor||cursor;processedTotal+=r.processed||0;sentTotal+=r.sent;failedTotal+=r.failed;
+  cursor=r.next_cursor||cursor;processedTotal+=r.processed||0;sentTotal+=r.sent;failedTotal+=r.failed;if((r.processed||0)>0)hasSentAny=true;
   el("sentCount").textContent=sentTotal;el("failedCount").textContent=failedTotal;
   finished=r.done||processedTotal>=eligible;el("sendBtn").disabled=finished;
   el("sendStatus").textContent="Batch completed: "+r.sent+" sent, "+r.failed+" failed. Processed: "+Math.min(processedTotal,eligible)+"/"+eligible+". "+(finished?"All eligible subscribers processed.":"Review and confirm to send the next batch.");
