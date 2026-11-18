@@ -26,10 +26,12 @@ async function requireAdmin(req) {
   const allowed = env("FARMCAST_ADMIN_EMAILS").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
   return !!user.email && user.email_confirmed_at != null && allowed.includes(user.email.toLowerCase());
 }
-function filters(body) {
-  const q = new URLSearchParams({ select: "id,chat_id,country,crop,preferred_language", status: "eq.active", order: "created_at.asc" });
+function filters(body, snapshotAt, cursor) {
+  const q = new URLSearchParams({ select: "id,chat_id,country,crop,preferred_language,created_at", status: "eq.active", order: "created_at.asc,id.asc" });
   if (body.country) q.set("country", "eq." + String(body.country).trim().slice(0, 80));
   if (body.crop) q.set("crop", "eq." + String(body.crop).trim().slice(0, 60));
+  q.set("created_at", "lte." + snapshotAt);
+  if (cursor) q.set("or", "(created_at.gt." + cursor.created_at + ",and(created_at.eq." + cursor.created_at + ",id.gt." + cursor.id + "))");
   return q;
 }
 async function telegram(method, payload) {
@@ -73,24 +75,39 @@ export default async function handler(req, res) {
       return json(res, 200, { connected: result === true, url: "https://farmcastea.vercel.app/api/telegram-webhook" });
     }
     const message = String(body.message || "").trim();
-    const query = filters(body);
     if (body.action === "preview") {
+      const snapshotAt = new Date().toISOString();
+      const query = filters(body, snapshotAt, null);
       let count = 0;
       for (let offset = 0; offset < 100000; offset += 1000) {
         const rows = await db("telegram_subscriptions?" + query.toString(), "GET", undefined, "", offset + "-" + (offset + 999));
         count += rows.length;
         if (rows.length < 1000) break;
       }
-      return json(res, 200, { eligible: count, country: body.country || null, crop: body.crop || null, max_per_click: 10 });
+      return json(res, 200, { eligible: count, snapshot_at: snapshotAt, country: body.country || null, crop: body.crop || null, max_per_click: 10 });
     }
     if (body.action === "send_batch") {
       if (!message || message.length > 3500) return json(res, 400, { error: "Message must contain 1–3500 characters." });
-      const offset = Number.isInteger(body.offset) && body.offset >= 0 ? Math.min(body.offset, 100000) : 0;
-      const rows = await db("telegram_subscriptions?" + query.toString(), "GET", undefined, "", offset + "-" + (offset + 9));
-      if (!rows.length) return json(res, 200, { sent: 0, failed: 0, next_offset: offset, done: true });
+      const snapshotAt = typeof body.snapshot_at === "string" ? body.snapshot_at : "";
+      const snapshotMs = Date.parse(snapshotAt);
+      if (!Number.isFinite(snapshotMs) || snapshotMs > Date.now() + 60000) return json(res, 400, { error: "Run a fresh subscriber preview before sending." });
+      let cursor = null;
+      if (body.cursor != null) {
+        const c = body.cursor;
+        if (!c || typeof c.created_at !== "string" || !Number.isFinite(Date.parse(c.created_at)) ||
+            Date.parse(c.created_at) > snapshotMs || typeof c.id !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(c.id)) {
+          return json(res, 400, { error: "Invalid broadcast cursor. Run a fresh preview." });
+        }
+        cursor = c;
+      }
+      const query = filters(body, snapshotAt, cursor);
+      const rows = await db("telegram_subscriptions?" + query.toString(), "GET", undefined, "", "0-10");
+      const batchRows = rows.slice(0, 10);
+      if (!batchRows.length) return json(res, 200, { sent: 0, failed: 0, processed: 0, next_cursor: cursor, done: true });
       const batchId = crypto.randomUUID();
       let sent = 0, failed = 0;
-      for (const row of rows) {
+      for (const row of batchRows) {
         let result = null, failure = null;
         try { result = await telegram("sendMessage", { chat_id: row.chat_id, text: message, disable_web_page_preview: true }); }
         catch (error) { failure = error; }
@@ -105,7 +122,12 @@ export default async function handler(req, res) {
         } catch (logError) { console.error("Telegram delivery log write failed:", logError.message); }
         if (failure) failed++; else sent++;
       }
-      return json(res, 200, { batch_id: batchId, sent, failed, next_offset: offset + rows.length, done: rows.length < 10 });
+      const last = batchRows[batchRows.length - 1];
+      return json(res, 200, {
+        batch_id: batchId, sent, failed, processed: batchRows.length,
+        next_cursor: { created_at: last.created_at, id: last.id },
+        done: rows.length <= 10
+      });
     }
     return json(res, 400, { error: "Unknown action." });
   } catch (error) {
