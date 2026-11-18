@@ -30,7 +30,7 @@ function filters(body, snapshotAt, cursor) {
   const q = new URLSearchParams({ select: "id,chat_id,country,crop,preferred_language,created_at", status: "eq.active", order: "created_at.asc,id.asc" });
   if (body.country) q.set("country", "eq." + String(body.country).trim().slice(0, 80));
   if (body.crop) q.set("crop", "eq." + String(body.crop).trim().slice(0, 60));
-  q.set("created_at", "lte." + snapshotAt);
+  q.set("consent_at", "lte." + snapshotAt);
   if (cursor) q.set("or", "(created_at.gt." + cursor.created_at + ",and(created_at.eq." + cursor.created_at + ",id.gt." + cursor.id + "))");
   return q;
 }
