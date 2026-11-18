@@ -4,7 +4,7 @@ This is a consent-first Telegram broadcast integration. It is intentionally sepa
 
 ## Components
 - `/api/telegram-webhook`: handles /start, consent buttons, /stop, /country and /crop.
-- `/api/telegram-admin`: approved-admin-only webhook setup, subscriber preview and manual 20-recipient batches.
+- `/api/telegram-admin`: approved-admin-only webhook setup, subscriber preview and manual 10-recipient batches.
 - `/admin/telegram.html`: protected admin screen using the existing Supabase Auth allowlist.
 - `telegram_subscriptions`: chat IDs, Telegram-specific consent and targeting preferences.
 - `telegram_delivery_logs`: sent/failed delivery audit trail.
@@ -18,7 +18,7 @@ Existing variables must remain unchanged:
 
 Add:
 - `TELEGRAM_BOT_TOKEN`: token from BotFather; server-side only.
-- `TELEGRAM_WEBHOOK_SECRET`: generate a unique random string of at least 32 characters. Keep it private.
+- `TELEGRAM_WEBHOOK_SECRET`: generate at least 32 random hexadecimal characters (for example, `openssl rand -hex 32`). Keep it private.
 
 Never add the bot token or Supabase secret key to a browser variable, HTML file, or Git commit.
 
@@ -47,7 +47,7 @@ Never add the bot token or Supabase secret key to a browser variable, HTML file,
 ## Broadcast safeguards
 - Admin login and exact email allowlist are required.
 - Preview counts active subscriptions only.
-- Each explicit send click handles at most 20 recipients.
+- Each explicit send click handles at most 10 recipients.
 - A confirmation dialog is required for every batch.
 - Sends are never scheduled or triggered automatically.
 - Each attempted delivery is logged as sent or failed.
