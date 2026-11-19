@@ -106,8 +106,12 @@ async function sendWeather(chatId, place, country, forecast) {
     await telegram("sendMessage", { chat_id: chatId, text: "Please include your town or district. Example: /" + (forecast ? "forecast" : "weather") + " Wakiso" + (country ? ", " + country : ", Uganda") + ". You can set your country with /country Uganda." });
     return;
   }
-  const searchName = country && !place.toLowerCase().includes(country.toLowerCase()) ? place + ", " + country : place;
-  const geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + enc(searchName) + "&count=8&language=en&format=json";
+  const placeParts = place.split(",");
+  const searchName = placeParts[0].trim();
+  const selectedCountry = country || (placeParts.length > 1 ? placeParts.slice(1).join(",").trim() : "");
+  const countryCodes = { Uganda: "UG", Kenya: "KE", Tanzania: "TZ", Rwanda: "RW", Burundi: "BI", "South Sudan": "SS", Ethiopia: "ET", Somalia: "SO", Djibouti: "DJ", "Democratic Republic of the Congo": "CD", "DR Congo": "CD", Sudan: "SD", Eritrea: "ER" };
+  const countryCode = Object.keys(countryCodes).find(name => name.toLowerCase() === selectedCountry.toLowerCase());
+  const geoUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + enc(searchName) + "&count=8&language=en&format=json" + (countryCode ? "&countryCode=" + countryCodes[countryCode] : "");
   const geoResponse = await fetch(geoUrl);
   if (!geoResponse.ok) throw new Error("Weather location search is temporarily unavailable.");
   const geoData = await geoResponse.json();
@@ -116,7 +120,7 @@ async function sendWeather(chatId, place, country, forecast) {
     await telegram("sendMessage", { chat_id: chatId, text: "I couldn't find that place. Try a nearby town or district, for example /weather Wakiso, Uganda." });
     return;
   }
-  const match = results.find(item => country && item.country && item.country.toLowerCase() === country.toLowerCase()) || results[0];
+  const match = results.find(item => selectedCountry && item.country && item.country.toLowerCase() === selectedCountry.toLowerCase()) || results[0];
   const label = [match.name, match.admin1, match.country].filter(Boolean).join(", ");
   const params = new URLSearchParams({
     latitude: String(match.latitude),
