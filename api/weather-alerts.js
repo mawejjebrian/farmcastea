@@ -1,4 +1,4 @@
-// Supabase Cron-triggered endpoint: 12-hourly, consent-first, test-only weather alerts.
+// Supabase Cron-triggered endpoint: twice-daily, consent-first, test-only weather alerts.
 const env = (name) => (process.env[name] || "").trim();
 const base = () => env("SUPABASE_URL").replace(/\/$/, "");
 const serviceKey = () => env("SUPABASE_SECRET_KEY") || env("SUPABASE_SERVICE_ROLE_KEY");
@@ -89,7 +89,7 @@ export default async function handler(req, res) {
   const signature = String(req.headers["x-signature"] || "");
   const signingSecret = env("WEATHER_ALERT_HMAC_SECRET");
   const timestampSeconds = Number(timestamp);
-  if (!signingSecret || !/^\\d{10}$/.test(timestamp) ||
+  if (!signingSecret || !/^\d{10}$/.test(timestamp) ||
       !Number.isFinite(timestampSeconds) ||
       Math.abs(Date.now() - timestampSeconds * 1000) > 5 * 60 * 1000 ||
       !/^[a-f0-9]{64}$/i.test(signature)) {
