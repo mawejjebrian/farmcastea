@@ -42,6 +42,19 @@
 <p id="sendStatus" class="status" role="status">No messages have been sent.</p>
 </section>
 <section class="panel">
+<h2>Publish to official channel</h2>
+<div class="notice">Manual publishing only. Every post requires your confirmation. This sends to the public FARMCAST EA channel, not to private subscribers.</div>
+<label>Channel post</label>
+<textarea id="channelMessage" maxlength="3500" placeholder="Write a weather update, farming tip or official announcement."></textarea>
+<p class="muted"><span id="channelCharCount">0</span>/3500 characters</p>
+<button id="channelPreviewBtn" class="secondary" onclick="previewChannelPost()">Preview post</button>
+<div id="channelPreviewBox" class="hidden">
+<div class="status" id="channelPreviewText" style="white-space:pre-wrap"></div>
+<button id="channelPublishBtn" onclick="publishChannelPost()">Publish to FARMCAST EA channel</button>
+</div>
+<p id="channelStatus" class="status" role="status">No channel post has been published from this dashboard.</p>
+</section>
+<section class="panel">
 <div class="topline"><div><h2>Recent delivery activity</h2><p class="muted">Latest 30 delivery attempts. Subscriber chat IDs are not displayed here.</p></div><button class="secondary" onclick="refreshLogs()">Refresh logs</button></div>
 <div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:8px">Time</th><th style="text-align:left;padding:8px">Status</th><th style="text-align:left;padding:8px">Telegram message ID</th><th style="text-align:left;padding:8px">Error</th></tr></thead><tbody id="logRows"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
 </section>
@@ -54,6 +67,32 @@ const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
 const el=id=>document.getElementById(id);
 let eligible=0,processedTotal=0,sentTotal=0,failedTotal=0,filtersLocked=null,messageLocked=null,snapshotAt=null,cursor=null,finished=true,hasSentAny=false;
 el("message").addEventListener("input",()=>el("charCount").textContent=el("message").value.length);
+el("channelMessage").addEventListener("input",()=>{el("channelCharCount").textContent=el("channelMessage").value.length;el("channelPreviewBox").classList.add("hidden");});
+let channelPreviewLocked="";
+function previewChannelPost(){
+ const message=el("channelMessage").value.trim();
+ if(!message||message.length>3500){el("channelStatus").textContent="Write a post of 1–3,500 characters.";return;}
+ channelPreviewLocked=message;
+ el("channelPreviewText").textContent=message;
+ el("channelPreviewBox").classList.remove("hidden");
+ el("channelStatus").textContent="Preview only. Nothing has been published yet.";
+}
+async function publishChannelPost(){
+ const message=el("channelMessage").value.trim();
+ if(!channelPreviewLocked||message!==channelPreviewLocked){el("channelStatus").textContent="The post changed. Preview it again before publishing.";el("channelPreviewBox").classList.add("hidden");return;}
+ if(!confirm("Publish this post publicly to the FARMCAST EA Telegram channel now?"))return;
+ el("channelPublishBtn").disabled=true;el("channelStatus").textContent="Publishing…";
+ try{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session)throw new Error("Your administrator session expired. Sign in again.");
+  const response=await fetch("/api/telegram-channel-publish",{method:"POST",headers:{Authorization:"Bearer "+session.access_token,"Content-Type":"application/json"},body:JSON.stringify({action:"publish",message})});
+  const result=await response.json();if(!response.ok)throw new Error(result.error||"Publishing failed.");
+  el("channelStatus").textContent="Published successfully to @FarmcastEA. Telegram message ID: "+result.message_id;
+  channelPreviewLocked="";el("channelPreviewBox").classList.add("hidden");el("channelMessage").value="";el("channelCharCount").textContent="0";
+ }catch(e){el("channelStatus").textContent=e.message;}
+ finally{el("channelPublishBtn").disabled=false;}
+}
+
 async function api(payload){
  const {data:{session}}=await sb.auth.getSession();
  if(!session)throw new Error("Your session expired. Sign in again.");
