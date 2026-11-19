@@ -274,12 +274,14 @@ export default async function handler(req, res) {
     } else if (command === "country") {
       if (!args || args.length > 80) await telegram("sendMessage", { chat_id: chatId, text: "Send your country like this: /country Uganda" });
       else {
+        if (!profile) await upsertPending(message.chat, message.from);
         await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)) + "&telegram_user_id=eq." + enc(String(userId)), "PATCH", { country: args, updated_at: new Date().toISOString() }, "return=minimal");
         await telegram("sendMessage", { chat_id: chatId, text: "Country preference saved: " + args + ". Use /weather Wakiso or /forecast Wakiso to check local conditions." });
       }
     } else if (command === "crop") {
       if (!args || args.length > 60) await telegram("sendMessage", { chat_id: chatId, text: "Send your main crop like this: /crop maize" });
       else {
+        if (!profile) await upsertPending(message.chat, message.from);
         await db("telegram_subscriptions?chat_id=eq." + enc(String(chatId)) + "&telegram_user_id=eq." + enc(String(userId)), "PATCH", { crop: args, updated_at: new Date().toISOString() }, "return=minimal");
         await telegram("sendMessage", { chat_id: chatId, text: "Crop preference saved: " + args + ". Use /advice for crop guidance." });
       }
